@@ -67,4 +67,3 @@ export function PracticeTestView({ onNavigate }: { onNavigate: (path: string) =>
     </section>
   );
 }
-

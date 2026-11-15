@@ -55,4 +55,3 @@ export function openStudyData(userId: string) {
     },
   };
 }
-

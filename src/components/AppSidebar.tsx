@@ -129,4 +129,3 @@ export function AppSidebar({ folders, foldersFailed, currentPath, onNavigate }: 
     </>
   );
 }
-

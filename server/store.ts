@@ -411,4 +411,3 @@ export function countGenerationsToday(db: Pick<DatabaseState, "generationJobs">,
       new Date(job.createdAt).getTime() >= cutoff
   ).length;
 }
-

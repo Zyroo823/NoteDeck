@@ -79,4 +79,3 @@ export interface StudyGuideDetail {
   createdAt: string;
   updatedAt: string;
 }
-

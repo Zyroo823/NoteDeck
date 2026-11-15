@@ -86,4 +86,3 @@ export type UpdateGuideInput = z.infer<typeof updateGuideSchema>;
 export type AiGenerationOutput = z.infer<typeof aiGenerationOutputSchema>;
 export type QuizAttemptInput = z.infer<typeof quizAttemptInputSchema>;
 export type SaveGeneratedResultInput = z.infer<typeof saveGeneratedResultSchema>;
-

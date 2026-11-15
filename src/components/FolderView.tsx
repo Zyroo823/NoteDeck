@@ -251,4 +251,3 @@ export function FolderView({ folder, onNavigate, onSaved, onDeleted }: FolderVie
     </section>
   );
 }
-
