@@ -1,0 +1,6 @@
+{
+  "name": "NoteDeck",
+  "description": "AI-powered flashcard sets, study guides, and multiple-choice practice quizzes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
