@@ -26,6 +26,7 @@ export interface RecentActivityItem {
 
 export interface LibrarySetSummary {
   id: string;
+  folderId: string | null;
   title: string;
   sourceType: "manual" | "ai" | "audio";
   cardCount: number;
@@ -35,12 +36,18 @@ export interface LibrarySetSummary {
 
 export interface LibraryGuideSummary {
   id: string;
+  folderId: string | null;
   setId: string | null;
   title: string;
   conceptCount: number;
   termCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FolderSummary {
+  id: string;
+  name: string;
 }
 
 export interface QuizAttemptSummary {
@@ -72,3 +79,4 @@ export interface StudyGuideDetail {
   createdAt: string;
   updatedAt: string;
 }
+

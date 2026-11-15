@@ -1,39 +1,20 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { FileText, Home, Layers, Library, PanelLeftOpen, X } from "lucide-react";
-
-interface RecentItem {
-  path: string;
-  title: string;
-}
+import { FileText, Folder, Home, Layers, Library, PanelLeftOpen, X } from "lucide-react";
+import type { FolderSummary } from "@/src/types/api";
 
 interface AppSidebarProps {
-  userId: string;
+  folders?: FolderSummary[];
+  foldersFailed?: boolean;
   currentPath: string;
   onNavigate: (path: string) => void;
 }
 
-const studyItemPath = /^\/(sets|guides)\/[^/?#]+$/;
 const sidebarSurface = "border-slate-200 bg-white dark:border-slate-800 dark:bg-[#131826]";
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500";
 const navItem = "relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium";
 const sectionLabel = "mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400";
 
-function readRecentItems(key: string): RecentItem[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
-    if (!Array.isArray(stored)) return [];
-    return stored.filter((item): item is RecentItem =>
-      typeof item?.path === "string" && studyItemPath.test(item.path) && item.path !== "/sets/new" &&
-      typeof item.title === "string"
-    ).slice(0, 3);
-  } catch {
-    return [];
-  }
-}
-
-export function AppSidebar({ userId, currentPath, onNavigate }: AppSidebarProps) {
-  const storageKey = `notedeck-recent-opened:${userId}`;
-  const [recent, setRecent] = useState(() => readRecentItems(storageKey));
+export function AppSidebar({ folders, foldersFailed, currentPath, onNavigate }: AppSidebarProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawer = useRef<HTMLDialogElement>(null);
   const { pathname, searchParams } = new URL(currentPath, window.location.origin);
@@ -41,42 +22,6 @@ export function AppSidebar({ userId, currentPath, onNavigate }: AppSidebarProps)
   const activePath = pathname === "/library" && (libraryType === "sets" || libraryType === "guides")
     ? `/library?type=${libraryType}`
     : pathname;
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(recent));
-    } catch {
-      // Keep the current session usable when browser storage is unavailable.
-    }
-  }, [recent, storageKey]);
-
-  useEffect(() => {
-    const kind = pathname.match(studyItemPath)?.[1];
-    if (!kind || pathname === "/sets/new") return;
-    const controller = new AbortController();
-    async function recordOpenedItem() {
-      try {
-        const response = await fetch(`/api${pathname}`, { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        if (response.status === 404) {
-          setRecent((items) => items.filter((item) => item.path !== pathname));
-          return;
-        }
-        if (!response.ok) return;
-        const detail = await response.json();
-        const title = (kind === "sets" ? detail.set : detail.guide)?.title;
-        if (typeof title !== "string" || controller.signal.aborted) return;
-        setRecent((items) => [
-          { path: pathname, title },
-          ...items.filter((item) => item.path !== pathname),
-        ].slice(0, 3));
-      } catch {
-        // Recent history is optional and should never block navigation.
-      }
-    }
-    void recordOpenedItem();
-    return () => controller.abort();
-  }, [pathname, userId]);
 
   useEffect(() => {
     drawer.current?.close();
@@ -132,17 +77,17 @@ export function AppSidebar({ userId, currentPath, onNavigate }: AppSidebarProps)
         </ul>
       </div>
       <div>
-        <h2 className={sectionLabel}>Recent</h2>
-        {recent.length > 0 ? (
+        <h2 className={sectionLabel}>Folders</h2>
+        {folders?.length ? (
           <ul className="space-y-0.5">
-            {recent.map(({ path, title }) => (
-              <li key={path}>{navLink(path, title, path.startsWith("/sets/")
-                ? <Layers aria-hidden="true" className={iconClass} />
-                : <FileText aria-hidden="true" className={iconClass} />)}</li>
+            {[...folders].sort((a, b) => a.name.localeCompare(b.name)).map(({ id, name }) => (
+              <li key={id}>{navLink(`/folders/${id}`, name, <Folder aria-hidden="true" className={iconClass} />)}</li>
             ))}
           </ul>
         ) : (
-          <p className="px-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Opened decks and guides appear here.</p>
+          <p className="px-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            {foldersFailed ? "Could not load folders." : folders ? "No folders yet." : "Loading folders…"}
+          </p>
         )}
       </div>
     </nav>
@@ -184,3 +129,4 @@ export function AppSidebar({ userId, currentPath, onNavigate }: AppSidebarProps)
     </>
   );
 }
+

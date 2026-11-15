@@ -25,6 +25,12 @@ export interface StudySetRecord {
   updatedAt: string;
 }
 
+export interface FolderRecord {
+  id: string;
+  userId: string;
+  name: string;
+}
+
 export interface CardRecord {
   id: string;
   setId: string;
@@ -38,6 +44,7 @@ export interface CardRecord {
 export interface StudyGuideRecord {
   id: string;
   userId: string;
+  folderId?: string | null;
   setId: string | null;
   title: string;
   content: StudyGuideContent;
@@ -71,6 +78,7 @@ export interface GenerationJobRecord {
 
 export interface DatabaseState {
   users: UserRecord[];
+  folders?: FolderRecord[];
   studySets: StudySetRecord[];
   cards: CardRecord[];
   studyGuides: StudyGuideRecord[];
@@ -403,3 +411,4 @@ export function countGenerationsToday(db: Pick<DatabaseState, "generationJobs">,
       new Date(job.createdAt).getTime() >= cutoff
   ).length;
 }
+

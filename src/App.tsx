@@ -11,7 +11,9 @@ import { StudyGuideView } from "@/src/components/StudyGuideView";
 import { SettingsView } from "@/src/components/SettingsView";
 import { AdminView } from "@/src/components/AdminView";
 import { GenerateModal } from "@/src/components/GenerateModal";
-import type { AuthUser } from "@/src/types/api";
+import { FolderView } from "@/src/components/FolderView";
+import { PracticeTestView } from "@/src/components/PracticeTestView";
+import type { AuthUser, FolderSummary } from "@/src/types/api";
 
 function getInitialTheme(): "dark" | "light" {
   if (typeof window === "undefined") return "dark";
@@ -32,6 +34,13 @@ export default function App() {
   );
   const [theme, setTheme] = useState<"dark" | "light">(getInitialTheme);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [folderList, setFolderList] = useState<{
+    userId: string;
+    folders: FolderSummary[];
+    failed?: boolean;
+  } | null>(null);
+  const [folderRetry, setFolderRetry] = useState(0);
+  const userId = user?.id;
 
   const navigate = useCallback((nextPath: string) => {
     window.history.pushState({}, "", nextPath);
@@ -84,6 +93,23 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    async function loadFolders(ownerId: string) {
+      try {
+        const response = await fetch("/api/folders", { signal: controller.signal });
+        if (!response.ok) throw new Error();
+        const { folders } = (await response.json()) as { folders: FolderSummary[] };
+        if (!controller.signal.aborted) setFolderList({ userId: ownerId, folders });
+      } catch {
+        if (!controller.signal.aborted) setFolderList({ userId: ownerId, folders: [], failed: true });
+      }
+    }
+    void loadFolders(userId);
+    return () => controller.abort();
+  }, [userId, folderRetry]);
+
   function toggleTheme() {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }
@@ -91,6 +117,7 @@ export default function App() {
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    setFolderList(null);
     setAuthMode("login");
     navigate("/");
   }
@@ -131,6 +158,7 @@ export default function App() {
   const searchQuery = parsedUrl.searchParams.get("q") ?? "";
   const typeParam = parsedUrl.searchParams.get("type");
   const modeParam = parsedUrl.searchParams.get("mode");
+  const currentFolders = folderList?.userId === user.id ? folderList : null;
 
   function renderMainRoute() {
     if (pathname === "/library") {
@@ -148,6 +176,51 @@ export default function App() {
 
     if (pathname === "/sets/new") {
       return <SetFormView mode="create" onNavigate={navigate} />;
+    }
+
+    if (pathname === "/practice-test") {
+      return <PracticeTestView onNavigate={navigate} />;
+    }
+
+    const folderMatch = pathname.match(/^\/folders\/([^/]+)$/);
+    if (folderMatch) {
+      if (!currentFolders) {
+        return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading folders…</p>;
+      }
+      if (currentFolders.failed) {
+        return (
+          <div className="space-y-2 text-sm">
+            <p role="alert">Could not load your folders.</p>
+            <button type="button" className="font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+              onClick={() => {
+                setFolderList(null);
+                setFolderRetry((value) => value + 1);
+              }}>Try again</button>
+          </div>
+        );
+      }
+      const folderId = folderMatch[1];
+      const folder = currentFolders.folders.find((entry) => entry.id === folderId);
+      if (!folder && folderId !== "new") {
+        return <p role="alert" className="text-sm">Folder not found.</p>;
+      }
+      return (
+        <FolderView
+          key={folderId}
+          folder={folder}
+          onNavigate={navigate}
+          onSaved={(updated) => setFolderList((current) =>
+            current && current.userId === userId
+              ? { ...current, folders: [...current.folders.filter((entry) => entry.id !== updated.id), updated] }
+              : current
+          )}
+          onDeleted={(id) => setFolderList((current) =>
+            current && current.userId === userId
+              ? { ...current, folders: current.folders.filter((entry) => entry.id !== id) }
+              : current
+          )}
+        />
+      );
     }
 
     const editMatch = pathname.match(/^\/sets\/([^/]+)\/edit$/);
@@ -195,6 +268,8 @@ export default function App() {
     <>
       <AppShell
         user={user}
+        folders={currentFolders?.folders}
+        foldersFailed={currentFolders?.failed}
         currentPath={currentPath}
         searchQuery={searchQuery}
         theme={theme}
@@ -217,3 +292,4 @@ export default function App() {
     </>
   );
 }
+

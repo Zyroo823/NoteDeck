@@ -13,11 +13,13 @@ import {
   Sparkles,
   Sun,
 } from "lucide-react";
-import type { AuthUser } from "@/src/types/api";
+import type { AuthUser, FolderSummary } from "@/src/types/api";
 import { AppSidebar } from "@/src/components/AppSidebar";
 
 interface AppShellProps {
   user: AuthUser;
+  folders?: FolderSummary[];
+  foldersFailed?: boolean;
   currentPath: string;
   searchQuery: string;
   theme: "dark" | "light";
@@ -30,6 +32,8 @@ interface AppShellProps {
 
 export function AppShell({
   user,
+  folders,
+  foldersFailed,
   currentPath,
   searchQuery,
   theme,
@@ -163,26 +167,26 @@ export function AppShell({
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]"
                 >
                   <Sparkles className="h-4 w-4 text-[#2DD4BF]" />
-                  Study guide
+                  Generate study materials
                 </button>
 
                 <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
 
-                <div className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-400">
-                  <span className="flex items-center gap-3">
-                    <ClipboardCheck className="h-4 w-4" />
-                    Practice test
-                  </span>
-                  <span className="text-xs text-slate-400">Phase 2</span>
-                </div>
+                <button type="button" role="menuitem" onClick={() => {
+                  setCreateOpen(false);
+                  onNavigate("/practice-test");
+                }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]">
+                  <ClipboardCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-[#5B6CFA]" />
+                  Practice test
+                </button>
 
-                <div className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-400">
-                  <span className="flex items-center gap-3">
-                    <Folder className="h-4 w-4" />
-                    Folder
-                  </span>
-                  <span className="text-xs text-slate-400">Phase 2</span>
-                </div>
+                <button type="button" role="menuitem" onClick={() => {
+                  setCreateOpen(false);
+                  onNavigate("/folders/new");
+                }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]">
+                  <Folder aria-hidden="true" className="h-4 w-4 shrink-0 text-[#5B6CFA]" />
+                  Folder
+                </button>
               </div>
             ) : null}
           </div>
@@ -269,10 +273,11 @@ export function AppShell({
       </header>
 
       <div className="flex min-h-[calc(100dvh-4rem)]">
-        <AppSidebar key={user.id} userId={user.id} currentPath={currentPath} onNavigate={onNavigate} />
+        <AppSidebar key={user.id} folders={folders} foldersFailed={foldersFailed} currentPath={currentPath} onNavigate={onNavigate} />
 
         <main className="min-w-0 flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-6 lg:px-10">{children}</main>
       </div>
     </div>
   );
 }
+

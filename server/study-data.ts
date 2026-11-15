@@ -1,6 +1,8 @@
-import { readDb, writeDb, type DatabaseState } from "./store";
+import { readDb, writeDb, type DatabaseState, type FolderRecord } from "./store";
 
-type StudyRows = Pick<DatabaseState, "studySets" | "cards" | "studyGuides" | "quizAttempts" | "generationJobs">;
+type StudyRows = Pick<DatabaseState, "studySets" | "cards" | "studyGuides" | "quizAttempts" | "generationJobs"> & {
+  folders: FolderRecord[];
+};
 
 // Open a fresh scope for each synchronous read/modify/write. Cards inherit ownership from their deck.
 export function openStudyData(userId: string) {
@@ -10,6 +12,7 @@ export function openStudyData(userId: string) {
   const ownedSets = allRows.studySets.filter(owns);
   const ownedSetIds = new Set(ownedSets.map((set) => set.id));
   const data: StudyRows = {
+    folders: (allRows.folders ?? []).filter(owns),
     studySets: ownedSets,
     cards: allRows.cards.filter((card) => ownedSetIds.has(card.setId)),
     studyGuides: allRows.studyGuides.filter(owns),
@@ -30,8 +33,11 @@ export function openStudyData(userId: string) {
     data,
     save() {
       const setIds = new Set(data.studySets.map((set) => set.id));
-      const ownerRows = [...data.studySets, ...data.studyGuides, ...data.quizAttempts, ...data.generationJobs];
+      const folderIds = new Set(data.folders.map((folder) => folder.id));
+      const studyItems = [...data.studySets, ...data.studyGuides];
+      const ownerRows = [...studyItems, ...data.folders, ...data.quizAttempts, ...data.generationJobs];
       if (!ownerRows.every(owns) ||
+          studyItems.some((item) => item.folderId != null && !folderIds.has(item.folderId)) ||
           data.cards.some((card) => !setIds.has(card.setId)) ||
           data.studyGuides.some((guide) => guide.setId !== null && !setIds.has(guide.setId)) ||
           data.quizAttempts.some((attempt) => !setIds.has(attempt.setId))) {
@@ -39,6 +45,7 @@ export function openStudyData(userId: string) {
       }
       writeDb({
         ...allRows,
+        folders: merge((allRows.folders ?? []).filter((row) => !owns(row)), data.folders),
         studySets: merge(allRows.studySets.filter((row) => !owns(row)), data.studySets),
         cards: merge(allRows.cards.filter((card) => !ownedSetIds.has(card.setId)), data.cards),
         studyGuides: merge(allRows.studyGuides.filter((row) => !owns(row)), data.studyGuides),
@@ -48,3 +55,4 @@ export function openStudyData(userId: string) {
     },
   };
 }
+

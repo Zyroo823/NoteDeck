@@ -25,6 +25,14 @@ export const studySetInputSchema = z.object({
   cards: z.array(cardInputSchema).min(1, "Add at least one flashcard").max(200, "Maximum 200 cards per set"),
 });
 
+export const folderNameSchema = z.string().trim().min(1, "Enter a folder name.").max(80, "Use 80 characters or fewer.");
+
+export const folderItemInputSchema = z.object({
+  kind: z.enum(["set", "guide"]),
+  id: z.string().min(1),
+  add: z.boolean(),
+});
+
 export const studyGuideConceptSchema = z.object({
   heading: z.string().trim().min(1, "Heading is required").max(160, "Heading is too long"),
   bullets: z.array(z.string().trim().min(1).max(600)).min(1, "Add at least one bullet point"),
@@ -78,3 +86,4 @@ export type UpdateGuideInput = z.infer<typeof updateGuideSchema>;
 export type AiGenerationOutput = z.infer<typeof aiGenerationOutputSchema>;
 export type QuizAttemptInput = z.infer<typeof quizAttemptInputSchema>;
 export type SaveGeneratedResultInput = z.infer<typeof saveGeneratedResultSchema>;
+

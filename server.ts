@@ -7,6 +7,8 @@ import { createServer as createViteServer } from "vite";
 import path from "node:path";
 import {
   cardInputSchema,
+  folderItemInputSchema,
+  folderNameSchema,
   loginSchema,
   pastedTextSchema,
   profileUpdateSchema,
@@ -300,6 +302,7 @@ async function startServer() {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .map((s) => ({
         id: s.id,
+        folderId: s.folderId ?? null,
         title: s.title,
         sourceType: s.sourceType,
         cardCount: db.cards.filter((c) => c.setId === s.id).length,
@@ -312,6 +315,7 @@ async function startServer() {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .map((g) => ({
         id: g.id,
+        folderId: g.folderId ?? null,
         setId: g.setId,
         title: g.title,
         conceptCount: g.content.key_concepts.length,
@@ -321,6 +325,82 @@ async function startServer() {
       }));
 
     res.json({ sets, guides });
+  });
+
+  // --- Folders ---
+  app.get("/api/folders", requireAuth, (req: AuthedRequest, res) => {
+    const { data } = openStudyData(req.userId!);
+    res.json({ folders: data.folders.map(({ id, name }) => ({ id, name })) });
+  });
+
+  function saveFolderName(req: AuthedRequest, res: Response) {
+    const parsed = folderNameSchema.safeParse(
+      typeof req.body?.name === "string" ? cleanPlainText(req.body.name) : ""
+    );
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
+      return;
+    }
+
+    const { data, save } = openStudyData(req.userId!);
+    const folderId = req.params.id;
+    const folder = folderId
+      ? data.folders.find((entry) => entry.id === folderId)
+      : { id: `folder-${crypto.randomUUID()}`, userId: req.userId!, name: parsed.data };
+    if (!folder) {
+      res.status(404).json({ error: "Folder not found." });
+      return;
+    }
+    folder.name = parsed.data;
+    if (!folderId) data.folders.push(folder);
+    save();
+    res.status(folderId ? 200 : 201).json({ folder: { id: folder.id, name: folder.name } });
+  }
+
+  app.post("/api/folders", requireAuth, saveFolderName);
+  app.patch("/api/folders/:id", requireAuth, saveFolderName);
+
+  app.patch("/api/folders/:id/items", requireAuth, (req: AuthedRequest, res) => {
+    const parsed = folderItemInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Choose a study item." });
+      return;
+    }
+
+    const { data, save } = openStudyData(req.userId!);
+    const folder = data.folders.find((entry) => entry.id === req.params.id);
+    const { kind, id, add } = parsed.data;
+    const rows = kind === "set" ? data.studySets : data.studyGuides;
+    const item = rows.find((entry) => entry.id === id);
+    if (!folder || !item) {
+      res.status(404).json({ error: "Folder or study item not found." });
+      return;
+    }
+    if (add && item.folderId && item.folderId !== folder.id) {
+      res.status(409).json({ error: "This item is already in another folder." });
+      return;
+    }
+    if (add || item.folderId === folder.id) {
+      item.folderId = add ? folder.id : null;
+      save();
+    }
+    res.json({ folderId: item.folderId ?? null });
+  });
+
+  app.delete("/api/folders/:id", requireAuth, (req: AuthedRequest, res) => {
+    const { data, save } = openStudyData(req.userId!);
+    const folderId = req.params.id;
+    const index = data.folders.findIndex((entry) => entry.id === folderId);
+    if (index === -1) {
+      res.status(404).json({ error: "Folder not found." });
+      return;
+    }
+    for (const item of [...data.studySets, ...data.studyGuides]) {
+      if (item.folderId === folderId) item.folderId = null;
+    }
+    data.folders.splice(index, 1);
+    save();
+    res.json({ ok: true });
   });
 
   // --- Study Sets & Cards ---
@@ -867,3 +947,4 @@ startServer().catch((err) => {
   console.error("Server failed to start:", err);
   process.exit(1);
 });
+
