@@ -2,22 +2,19 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import {
   BookOpen,
   ClipboardCheck,
-  FileText,
   Folder,
-  Home,
   Layers,
-  Library,
   LogOut,
-  Menu,
   Moon,
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   Sun,
-  X,
 } from "lucide-react";
 import type { AuthUser } from "@/src/types/api";
+import { AppSidebar } from "@/src/components/AppSidebar";
 
 interface AppShellProps {
   user: AuthUser;
@@ -42,8 +39,6 @@ export function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [createOpen, setCreateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -56,7 +51,6 @@ export function AppShell({
   }, [searchQuery]);
 
   useEffect(() => {
-    setMobileOpen(false);
     setCreateOpen(false);
     setProfileOpen(false);
   }, [currentPath]);
@@ -75,7 +69,6 @@ export function AppShell({
       if (event.key === "Escape") {
         setCreateOpen(false);
         setProfileOpen(false);
-        setMobileOpen(false);
       }
     }
     document.addEventListener("mousedown", handleOutside);
@@ -93,44 +86,23 @@ export function AppShell({
   }
 
   const initialLetter = user.name.trim().slice(0, 1).toUpperCase() || "S";
-  const isHome = currentPath === "/";
-  const isLibraryAll = currentPath === "/library";
-  const isLibrarySets = currentPath === "/library?type=sets";
-  const isLibraryGuides = currentPath === "/library?type=guides";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0E17] dark:text-slate-100">
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-[#0B0E17]/95">
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              if (window.innerWidth < 768) {
-                setMobileOpen((prev) => !prev);
-              } else {
-                setDesktopCollapsed((prev) => !prev);
-              }
-            }}
-            aria-label="Toggle navigation sidebar"
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:text-slate-300 dark:hover:bg-[#1C2336]"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("/")}
+          aria-label="Go to NoteDeck Home"
+          className="flex items-center gap-2.5 rounded-xl py-1.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#5B6CFA] text-white">
+            <BookOpen className="h-4 w-4" />
+          </span>
+          <span className="hidden text-base font-bold tracking-tight sm:inline">NoteDeck</span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => onNavigate("/")}
-            aria-label="Go to NoteDeck Home"
-            className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#5B6CFA] text-white">
-              <BookOpen className="h-4 w-4" />
-            </span>
-            <span className="hidden text-base font-bold tracking-tight sm:inline">NoteDeck</span>
-          </button>
-        </div>
-
-        <form onSubmit={handleSearchSubmit} className="max-w-xl flex-1">
+        <form onSubmit={handleSearchSubmit} className="min-w-0 max-w-xl flex-1">
           <label htmlFor="top-search-library" className="sr-only">
             Search your library
           </label>
@@ -241,6 +213,13 @@ export function AppShell({
                 </div>
 
                 <div className="py-1">
+                  {user.role === "admin" && (
+                    <button type="button" role="menuitem" onClick={() => { setProfileOpen(false); onNavigate("/admin"); }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-[#1C2336]">
+                      <ShieldCheck className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                      Manage users
+                    </button>
+                  )}
                   <button
                     type="button"
                     role="menuitem"
@@ -289,103 +268,10 @@ export function AppShell({
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-4rem)]">
-        {mobileOpen ? (
-          <div
-            className="fixed inset-0 z-30 bg-black/50 md:hidden"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden="true"
-          />
-        ) : null}
+      <div className="flex min-h-[calc(100dvh-4rem)]">
+        <AppSidebar key={user.id} userId={user.id} currentPath={currentPath} onNavigate={onNavigate} />
 
-        <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 border-r border-slate-200 bg-white p-4 transition-transform dark:border-slate-800 dark:bg-[#0B0E17] md:static md:z-auto ${
-            mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-          } ${desktopCollapsed ? "md:hidden" : "md:block"}`}
-        >
-          <div className="mb-4 flex items-center justify-between md:hidden">
-            <span className="text-base font-bold">NoteDeck</span>
-            <button
-              type="button"
-              onClick={() => setMobileOpen(false)}
-              aria-label="Close navigation sidebar"
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-[#1C2336]"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <nav aria-label="Primary navigation" className="space-y-6">
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => onNavigate("/")}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium whitespace-nowrap transition ${
-                  isHome
-                    ? "bg-[#5B6CFA]/15 text-[#5B6CFA]"
-                    : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#141926]"
-                }`}
-              >
-                <Home className="h-4 w-4 shrink-0" />
-                Home
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigate("/library")}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium whitespace-nowrap transition ${
-                  isLibraryAll
-                    ? "bg-[#5B6CFA]/15 text-[#5B6CFA]"
-                    : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#141926]"
-                }`}
-              >
-                <Library className="h-4 w-4 shrink-0" />
-                Your library
-              </button>
-            </div>
-
-            <div>
-              <p className="mb-2 px-3 text-xs font-semibold text-slate-400">Start here</p>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => onNavigate("/library?type=sets")}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium whitespace-nowrap transition ${
-                    isLibrarySets
-                      ? "bg-[#5B6CFA]/15 text-[#5B6CFA]"
-                      : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#141926]"
-                  }`}
-                >
-                  <Layers className="h-4 w-4 shrink-0 text-[#5B6CFA]" />
-                  Flashcards
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate("/library?type=guides")}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium whitespace-nowrap transition ${
-                    isLibraryGuides
-                      ? "bg-[#2DD4BF]/15 text-[#2DD4BF]"
-                      : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#141926]"
-                  }`}
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-[#2DD4BF]" />
-                  Study Guides
-                </button>
-
-                <div className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400">
-                  <span className="flex items-center gap-3 whitespace-nowrap">
-                    <ClipboardCheck className="h-4 w-4 shrink-0" />
-                    Practice Tests
-                  </span>
-                  <span className="text-xs text-slate-500">Phase 2</span>
-                </div>
-              </div>
-            </div>
-          </nav>
-        </aside>
-
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-6 lg:px-10">{children}</main>
       </div>
     </div>
   );

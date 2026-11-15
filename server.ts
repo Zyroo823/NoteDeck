@@ -18,7 +18,6 @@ import {
 } from "./src/lib/schemas";
 import { cleanPlainText, validateUploadFiles } from "./src/lib/studyLogic";
 import {
-  checkRateLimit,
   countGenerationsToday,
   createSessionToken,
   hashPassword,
@@ -29,6 +28,9 @@ import {
 } from "./server/store";
 import { extractFromUploadedFiles } from "./server/extract";
 import { generateStudyMaterials } from "./server/ai";
+import { registerGoogleAuth } from "./server/google-auth";
+import { rateLimit } from "./server/rate-limit";
+import { openStudyData } from "./server/study-data";
 
 const COOKIE_NAME = "notedeck_session";
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -46,18 +48,11 @@ interface AuthedRequest extends Request {
   userId?: string;
 }
 
-function getClientIp(req: Request): string {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string" && fwd.length > 0) {
-    return fwd.split(",")[0].trim();
-  }
-  return req.socket.remoteAddress ?? "unknown";
-}
-
-function setSessionCookie(res: Response, userId: string): void {
+function setSessionCookie(res: Response, userId: string, secure = false): void {
   const token = createSessionToken(userId);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
+    secure,
     sameSite: "lax",
     path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -84,17 +79,11 @@ function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): voi
 
 async function startServer() {
   const app = express();
-  app.use(cookieParser());
+  app.use(cookieParser(process.env.SESSION_SECRET));
   app.use(express.json({ limit: "2mb" }));
 
   // --- Auth Routes ---
-  app.post("/api/auth/signup", (req, res) => {
-    const ip = getClientIp(req);
-    if (!checkRateLimit(`signup:${ip}`, 10, 60 * 1000)) {
-      res.status(429).json({ error: "Too many signup attempts. Wait a minute and try again." });
-      return;
-    }
-
+  app.post("/api/auth/signup", rateLimit("signup", 10, "Too many signup attempts. Wait a minute and try again."), (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid signup details" });
@@ -124,13 +113,7 @@ async function startServer() {
     });
   });
 
-  app.post("/api/auth/login", (req, res) => {
-    const ip = getClientIp(req);
-    if (!checkRateLimit(`login:${ip}`, 15, 60 * 1000)) {
-      res.status(429).json({ error: "Too many login attempts. Wait a minute and try again." });
-      return;
-    }
-
+  app.post("/api/auth/login", rateLimit("login", 15, "Too many login attempts. Wait a minute and try again."), (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid login details" });
@@ -139,29 +122,19 @@ async function startServer() {
 
     const db = readDb();
     const user = db.users.find((u) => u.email.toLowerCase() === parsed.data.email.toLowerCase());
-    if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
+    if (!user?.passwordHash || user.suspended || user.id === "user-demo-student" ||
+        !verifyPassword(parsed.data.password, user.passwordHash)) {
       res.status(401).json({ error: "Incorrect email or password." });
       return;
     }
 
     setSessionCookie(res, user.id);
     res.json({
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" },
     });
   });
 
-  app.post("/api/auth/demo", (_req, res) => {
-    const db = readDb();
-    const demoUser = db.users.find((u) => u.email === "demo@notedeck.app");
-    if (!demoUser) {
-      res.status(404).json({ error: "Demo account not found" });
-      return;
-    }
-    setSessionCookie(res, demoUser.id);
-    res.json({
-      user: { id: demoUser.id, name: demoUser.name, email: demoUser.email },
-    });
-  });
+  registerGoogleAuth(app, setSessionCookie);
 
   app.post("/api/auth/logout", (_req, res) => {
     res.clearCookie(COOKIE_NAME, { path: "/" });
@@ -183,7 +156,7 @@ async function startServer() {
       return;
     }
     res.json({
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" },
       generationsUsedToday: countGenerationsToday(db, user.id),
       dailyGenerationLimit: DAILY_CAP,
     });
@@ -203,12 +176,69 @@ async function startServer() {
     }
     user.name = cleanPlainText(parsed.data.name);
     writeDb(db);
-    res.json({ user: { id: user.id, name: user.name, email: user.email } });
+    res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" } });
+  });
+
+  app.get("/api/admin/users", requireAuth, (req: AuthedRequest, res) => {
+    const db = readDb();
+    if (db.users.find((user) => user.id === req.userId)?.role !== "admin") {
+      res.status(403).json({ error: "Administrator access required." });
+      return;
+    }
+    res.set("Cache-Control", "no-store");
+    res.json({ users: db.users.map(({ id, name, email, role, suspended, createdAt }) =>
+      ({ id, name, email, role: role ?? "user", suspended: suspended ?? false, createdAt })) });
+  });
+
+  app.patch("/api/admin/users/:id", requireAuth, (req: AuthedRequest, res) => {
+    const origin = req.get("origin");
+    const host = req.get("host");
+    if (!origin || !host || !["http", "https"].some((scheme) => origin === `${scheme}://${host}`)) {
+      res.status(403).json({ error: "Invalid request origin." });
+      return;
+    }
+    const db = readDb();
+    const actor = db.users.find((user) => user.id === req.userId);
+    if (actor?.role !== "admin") {
+      res.status(403).json({ error: "Administrator access required." });
+      return;
+    }
+    const target = db.users.find((user) => user.id === req.params.id);
+    if (!target) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+    const { role, suspended } = req.body ?? {};
+    const keys = Object.keys(req.body ?? {});
+    if (keys.length !== 1 || (keys[0] === "role" && role !== "admin" && role !== "user") ||
+        (keys[0] === "suspended" && typeof suspended !== "boolean") ||
+        !["role", "suspended"].includes(keys[0])) {
+      res.status(400).json({ error: "Invalid account update." });
+      return;
+    }
+    if (target.id === actor.id) {
+      res.status(400).json({ error: "You cannot change your own role or access." });
+      return;
+    }
+    if (target.role === "admin" && (role === "user" || suspended === true) &&
+        db.users.filter((user) => user.role === "admin" && !user.suspended).length <= 1) {
+      res.status(400).json({ error: "At least one active administrator is required." });
+      return;
+    }
+    const action = keys[0] === "role" ? `role:${role}` : (suspended ? "suspended" : "restored");
+    if (keys[0] === "role") target.role = role;
+    else {
+      if (!target.suspended && suspended) target.sessionVersion = (target.sessionVersion ?? 0) + 1;
+      target.suspended = suspended;
+    }
+    (db.adminAudit ??= []).push({ actorId: actor.id, targetId: target.id, action, createdAt: new Date().toISOString() });
+    writeDb(db);
+    res.json({ ok: true });
   });
 
   // --- Home & Library Routes ---
   app.get("/api/home", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db } = openStudyData(req.userId!);
     const userId = req.userId!;
 
     const userSets = db.studySets
@@ -261,7 +291,7 @@ async function startServer() {
   });
 
   app.get("/api/library", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db } = openStudyData(req.userId!);
     const userId = req.userId!;
     const q = cleanPlainText(typeof req.query.q === "string" ? req.query.q : "").toLowerCase();
 
@@ -301,7 +331,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const now = new Date().toISOString();
     const setId = `set-${crypto.randomUUID()}`;
 
@@ -327,20 +357,20 @@ async function startServer() {
 
     db.studySets.push(newSet);
     db.cards.push(...newCards);
-    writeDb(db);
+    save();
 
     res.status(201).json({ set: newSet });
   });
 
   app.get("/api/sets/:id", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db } = openStudyData(req.userId!);
     const set = db.studySets.find((s) => s.id === req.params.id && s.userId === req.userId);
     if (!set) {
       res.status(404).json({ error: "Study set not found." });
       return;
     }
 
-    const owner = db.users.find((u) => u.id === set.userId);
+    const owner = readDb().users.find((u) => u.id === req.userId);
     const cards = db.cards
       .filter((c) => c.setId === set.id)
       .sort((a, b) => a.position - b.position);
@@ -370,7 +400,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const set = db.studySets.find((s) => s.id === req.params.id && s.userId === req.userId);
     if (!set) {
       res.status(404).json({ error: "Study set not found." });
@@ -391,13 +421,13 @@ async function startServer() {
       masteryStatus: "new" as const,
     }));
     db.cards.push(...updatedCards);
-    writeDb(db);
+    save();
 
     res.json({ set, cards: updatedCards });
   });
 
   app.delete("/api/sets/:id", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const idx = db.studySets.findIndex(
       (s) => s.id === req.params.id && s.userId === req.userId
     );
@@ -415,7 +445,7 @@ async function startServer() {
         guide.setId = null;
       }
     }
-    writeDb(db);
+    save();
 
     res.json({ ok: true });
   });
@@ -427,7 +457,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const set = db.studySets.find((s) => s.id === req.params.id && s.userId === req.userId);
     if (!set) {
       res.status(404).json({ error: "Study set not found." });
@@ -447,7 +477,7 @@ async function startServer() {
 
     db.cards.push(newCard);
     set.updatedAt = new Date().toISOString();
-    writeDb(db);
+    save();
 
     res.status(201).json({ card: newCard });
   });
@@ -459,7 +489,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const card = db.cards.find((c) => c.id === req.params.id);
     if (!card) {
       res.status(404).json({ error: "Card not found." });
@@ -475,13 +505,13 @@ async function startServer() {
     card.term = cleanPlainText(parsed.data.term);
     card.definition = cleanPlainText(parsed.data.definition);
     parentSet.updatedAt = new Date().toISOString();
-    writeDb(db);
+    save();
 
     res.json({ card });
   });
 
   app.delete("/api/cards/:id", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const cardIdx = db.cards.findIndex((c) => c.id === req.params.id);
     if (cardIdx === -1) {
       res.status(404).json({ error: "Card not found." });
@@ -497,14 +527,14 @@ async function startServer() {
 
     db.cards.splice(cardIdx, 1);
     parentSet.updatedAt = new Date().toISOString();
-    writeDb(db);
+    save();
 
     res.json({ ok: true });
   });
 
   // --- Study Guides ---
   app.get("/api/guides/:id", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db } = openStudyData(req.userId!);
     const guide = db.studyGuides.find(
       (g) => g.id === req.params.id && g.userId === req.userId
     );
@@ -522,7 +552,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const guide = db.studyGuides.find(
       (g) => g.id === req.params.id && g.userId === req.userId
     );
@@ -541,13 +571,13 @@ async function startServer() {
       important_terms: parsed.data.content.important_terms.map((t) => cleanPlainText(t)),
     };
     guide.updatedAt = new Date().toISOString();
-    writeDb(db);
+    save();
 
     res.json({ guide });
   });
 
   app.delete("/api/guides/:id", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const idx = db.studyGuides.findIndex(
       (g) => g.id === req.params.id && g.userId === req.userId
     );
@@ -556,7 +586,7 @@ async function startServer() {
       return;
     }
     db.studyGuides.splice(idx, 1);
-    writeDb(db);
+    save();
     res.json({ ok: true });
   });
 
@@ -568,7 +598,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const set = db.studySets.find(
       (s) => s.id === parsed.data.setId && s.userId === req.userId
     );
@@ -589,7 +619,7 @@ async function startServer() {
 
     db.quizAttempts.push(attempt);
     set.updatedAt = new Date().toISOString();
-    writeDb(db);
+    save();
 
     res.status(201).json({ attempt });
   });
@@ -598,6 +628,7 @@ async function startServer() {
   app.post(
     "/api/generate",
     requireAuth,
+    rateLimit("generate", 6, "Too many generation requests. Wait a minute and try again.", (req: AuthedRequest) => req.userId!),
     (req: AuthedRequest, res: Response, next: NextFunction) => {
       const contentType = req.headers["content-type"] ?? "";
       if (contentType.includes("multipart/form-data")) {
@@ -620,12 +651,7 @@ async function startServer() {
     },
     async (req: AuthedRequest, res: Response) => {
       const userId = req.userId!;
-      if (!checkRateLimit(`generate:${userId}`, 6, 60 * 1000)) {
-        res.status(429).json({ error: "Too many generation requests. Wait a minute and try again." });
-        return;
-      }
-
-      const db = readDb();
+      const { data: db, save } = openStudyData(req.userId!);
       if (countGenerationsToday(db, userId) >= DAILY_CAP) {
         res.status(429).json({
           error: `Daily limit reached (${DAILY_CAP} AI generations per day). Create manual sets anytime.`,
@@ -675,7 +701,7 @@ async function startServer() {
       };
 
       db.generationJobs.push(job);
-      writeDb(db);
+      save();
 
       // Copy buffers and clear multer references right after starting async processing
       const fileInputs = uploadedFiles.map((f) => ({
@@ -702,26 +728,26 @@ async function startServer() {
           }
 
           const result = await generateStudyMaterials(sourcePayload, (stepMessage) => {
-            const currentDb = readDb();
+            const { data: currentDb, save } = openStudyData(userId);
             const target = currentDb.generationJobs.find((j) => j.id === jobId);
             if (target) {
               target.stepMessage = stepMessage;
               target.updatedAt = new Date().toISOString();
-              writeDb(currentDb);
+              save();
             }
           });
 
-          const finalDb = readDb();
+          const { data: finalDb, save } = openStudyData(userId);
           const target = finalDb.generationJobs.find((j) => j.id === jobId);
           if (target) {
             target.status = "done";
             target.stepMessage = "Ready to review";
             target.previewResult = result;
             target.updatedAt = new Date().toISOString();
-            writeDb(finalDb);
+            save();
           }
         } catch (err) {
-          const finalDb = readDb();
+          const { data: finalDb, save } = openStudyData(userId);
           const target = finalDb.generationJobs.find((j) => j.id === jobId);
           if (target) {
             target.status = "failed";
@@ -729,7 +755,7 @@ async function startServer() {
             target.error =
               err instanceof Error ? err.message : "Failed to generate study material.";
             target.updatedAt = new Date().toISOString();
-            writeDb(finalDb);
+            save();
           }
         }
       })();
@@ -737,7 +763,7 @@ async function startServer() {
   );
 
   app.get("/api/generate/:id", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db } = openStudyData(req.userId!);
     const job = db.generationJobs.find(
       (j) => j.id === req.params.id && j.userId === req.userId
     );
@@ -749,7 +775,7 @@ async function startServer() {
   });
 
   app.post("/api/generate/:id/save", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+    const { data: db, save } = openStudyData(req.userId!);
     const job = db.generationJobs.find(
       (j) => j.id === req.params.id && j.userId === req.userId
     );
@@ -811,7 +837,7 @@ async function startServer() {
     job.resultSetId = setId;
     job.resultGuideId = guideId;
     job.updatedAt = now;
-    writeDb(db);
+    save();
 
     res.status(201).json({ setId, guideId });
   });

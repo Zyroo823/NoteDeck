@@ -3,11 +3,13 @@ import { Loader2 } from "lucide-react";
 import { AuthScreen } from "@/src/components/AuthScreen";
 import { AppShell } from "@/src/components/AppShell";
 import { HomeView } from "@/src/components/HomeView";
+import { LandingPage } from "@/src/components/LandingPage";
 import { LibraryView } from "@/src/components/LibraryView";
 import { SetFormView } from "@/src/components/SetFormView";
 import { StudySetView } from "@/src/components/StudySetView";
 import { StudyGuideView } from "@/src/components/StudyGuideView";
 import { SettingsView } from "@/src/components/SettingsView";
+import { AdminView } from "@/src/components/AdminView";
 import { GenerateModal } from "@/src/components/GenerateModal";
 import type { AuthUser } from "@/src/types/api";
 
@@ -90,7 +92,7 @@ export default function App() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     setAuthMode("login");
-    navigate("/login");
+    navigate("/");
   }
 
   if (checkingAuth) {
@@ -100,6 +102,11 @@ export default function App() {
       </div>
     );
   }
+
+  const parsedUrl = new URL(currentPath, "http://localhost");
+  const pathname = parsedUrl.pathname;
+
+  if (!user && pathname === "/") return <LandingPage theme={theme} onToggleTheme={toggleTheme} />;
 
   if (!user) {
     return (
@@ -121,8 +128,6 @@ export default function App() {
     );
   }
 
-  const parsedUrl = new URL(currentPath, "http://localhost");
-  const pathname = parsedUrl.pathname;
   const searchQuery = parsedUrl.searchParams.get("q") ?? "";
   const typeParam = parsedUrl.searchParams.get("type");
   const modeParam = parsedUrl.searchParams.get("mode");
@@ -175,6 +180,12 @@ export default function App() {
           onUserUpdated={(updated) => setUser(updated)}
         />
       );
+    }
+
+    if (pathname === "/admin") {
+      return user?.role === "admin"
+        ? <AdminView currentUserId={user.id} />
+        : <div role="alert" className="mx-auto max-w-4xl">Administrator access required.</div>;
     }
 
     return <HomeView onNavigate={navigate} onOpenGenerate={() => setGenerateOpen(true)} />;

@@ -18,7 +18,7 @@ Create flashcards, explore study guides, and practice what you've learned—all 
 - **Generate study materials** from pasted notes or PDF, DOCX, and PPTX files using Gemini.
 - **Review with flashcards** and practice with multiple-choice quizzes.
 - **Keep your materials together** in a personal library with study guides and quiz history.
-- **Create an account** or try the app with its demo option.
+- **Create an account** with a password or sign in with Gmail when configured.
 
 ## Getting started
 
@@ -50,6 +50,25 @@ Create flashcards, explore study guides, and practice what you've learned—all 
 4. Open [http://localhost:3000](http://localhost:3000).
 
 The server loads `.env` automatically. The API key is needed for generation; store it only in your local environment, never in source control.
+
+### Enable Gmail sign-in
+
+1. In [Google Cloud](https://console.cloud.google.com/), configure the OAuth consent screen and create a **Web application** OAuth client. If the app is in testing mode, add the Gmail accounts that will test it to the audience.
+2. Add `http://localhost:3000/api/auth/google/callback` to the client's **Authorized redirect URIs**.
+3. In `.env`, set `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `SESSION_SECRET`. Generate a session secret with `node -p "require('node:crypto').randomBytes(32).toString('hex')"`. Changing the session secret signs users out.
+4. Restart the app and open it at `http://localhost:3000`. For another origin, set `GOOGLE_OAUTH_REDIRECT_URI` to the full callback URL and register that exact URI in Google Cloud. Use HTTPS for a non-loopback origin.
+
+The first successful Gmail sign-in creates a NoteDeck account, or links the verified Gmail address to an existing account with the same email. Existing password sign-in remains available.
+
+### Rate limits and account access
+
+Signup, password login, and Gmail OAuth requests are limited per client IP. AI generation is limited per account before file parsing and still has the daily quota. These counters are in memory and apply within one server process. By default the app uses the connection IP and ignores forwarded IP headers.
+
+NoteDeck's local JSON store enforces study record ownership in application code. Decks, cards, guides, attempts, and generation jobs are scoped to the signed-in account. The JSON store does not support database-native row-level security.
+
+### Administrator access
+
+Administrators can open **Manage users** from the profile menu to change roles and suspend or restore accounts. Suspending an account invalidates its existing sessions. Role and access changes are recorded in the local database. Administrators cannot change their own role or suspend their own account.
 
 ## Project structure
 

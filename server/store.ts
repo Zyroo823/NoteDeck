@@ -7,7 +7,11 @@ export interface UserRecord {
   id: string;
   name: string;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleSubject?: string;
+  role?: "admin" | "user";
+  suspended?: boolean;
+  sessionVersion?: number;
   createdAt: string;
 }
 
@@ -72,26 +76,12 @@ export interface DatabaseState {
   studyGuides: StudyGuideRecord[];
   quizAttempts: QuizAttemptRecord[];
   generationJobs: GenerationJobRecord[];
+  adminAudit?: { actorId: string; targetId: string; action: string; createdAt: string }[];
 }
 
 const DATA_DIR = path.resolve(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
-const SESSION_SECRET = process.env.SESSION_SECRET || "notedeck-local-dev-secret-key-2026";
-
-const rateBuckets = new Map<string, number[]>();
-
-export function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  const existing = rateBuckets.get(key) ?? [];
-  const active = existing.filter((ts) => now - ts < windowMs);
-  if (active.length >= maxRequests) {
-    rateBuckets.set(key, active);
-    return false;
-  }
-  active.push(now);
-  rateBuckets.set(key, active);
-  return true;
-}
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -110,8 +100,9 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 
 export function createSessionToken(userId: string): string {
+  const user = readDb().users.find((record) => record.id === userId);
   const payload = Buffer.from(
-    JSON.stringify({ uid: userId, iat: Date.now() }),
+    JSON.stringify({ uid: userId, iat: Date.now(), version: user?.sessionVersion ?? 0 }),
     "utf8"
   ).toString("base64url");
   const sig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
@@ -132,8 +123,12 @@ export function verifySessionToken(token: string | undefined): string | null {
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
       uid?: string;
+      version?: number;
     };
-    return typeof parsed.uid === "string" ? parsed.uid : null;
+    if (typeof parsed.uid !== "string") return null;
+    const user = readDb().users.find((record) => record.id === parsed.uid);
+    if (!user || user.suspended || (parsed.version ?? 0) !== (user.sessionVersion ?? 0)) return null;
+    return parsed.uid;
   } catch {
     return null;
   }
@@ -154,7 +149,6 @@ function buildSeedState(): DatabaseState {
         id: demoUserId,
         name: "Alex Rivera",
         email: "demo@notedeck.app",
-        passwordHash: hashPassword("StudyPass123!"),
         createdAt: earlier,
       },
     ],
@@ -398,7 +392,7 @@ export function writeDb(state: DatabaseState): void {
   fs.renameSync(tempFile, DB_FILE);
 }
 
-export function countGenerationsToday(db: DatabaseState, userId: string): number {
+export function countGenerationsToday(db: Pick<DatabaseState, "generationJobs">, userId: string): number {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const cutoff = startOfDay.getTime();

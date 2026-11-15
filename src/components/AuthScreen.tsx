@@ -3,6 +3,16 @@ import { BookOpen, Moon, Sun } from "lucide-react";
 import { loginSchema, signupSchema } from "@/src/lib/schemas";
 import type { AuthUser } from "@/src/types/api";
 
+const googleSignInMessages = new Map([
+  ["unavailable", "Gmail sign-in is not set up yet. You can still sign in with your email and password."],
+  ["expired", "This Gmail sign-in request expired. Please try again."],
+  ["cancelled", "Gmail sign-in was cancelled."],
+  ["failed", "Could not sign in with Gmail. Please try again."],
+  ["gmail-required", "Choose a verified Gmail account to continue."],
+  ["existing", "This NoteDeck account is already linked to a different Google account."],
+  ["suspended", "This account has been suspended. Contact an administrator."],
+]);
+
 interface AuthScreenProps {
   mode: "login" | "signup";
   theme: "dark" | "light";
@@ -21,7 +31,10 @@ export function AuthScreen({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState(() => {
+    const outcome = new URLSearchParams(window.location.search).get("google");
+    return googleSignInMessages.get(outcome ?? "") ?? "";
+  });
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -77,24 +90,6 @@ export function AuthScreen({
       onAuthenticated(data.user);
     } catch {
       setErrorMessage("Network error while signing in.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDemoLogin() {
-    setErrorMessage("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/demo", { method: "POST" });
-      const data = (await res.json()) as { user?: AuthUser; error?: string };
-      if (!res.ok || !data.user) {
-        setErrorMessage(data.error ?? "Could not start demo session.");
-        return;
-      }
-      onAuthenticated(data.user);
-    } catch {
-      setErrorMessage("Network error while starting demo session.");
     } finally {
       setLoading(false);
     }
@@ -169,7 +164,7 @@ export function AuthScreen({
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@school.edu"
+              placeholder={mode === "login" ? "Enter your email" : "you@school.edu"}
               className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
@@ -209,11 +204,11 @@ export function AuthScreen({
 
         <button
           type="button"
-          onClick={handleDemoLogin}
+          onClick={() => window.location.assign("/api/auth/google")}
           disabled={loading}
           className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#1C2336] dark:text-slate-100 dark:hover:bg-slate-700/60"
         >
-          Continue with Demo Account
+          Continue with Gmail Account
         </button>
 
         <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
@@ -230,6 +225,9 @@ export function AuthScreen({
           </button>
         </p>
       </div>
+      <a href="/" className="mt-5 rounded-md text-sm font-medium text-slate-600 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#5B6CFA] dark:text-slate-300">
+        ← Back to NoteDeck
+      </a>
     </main>
   );
 }
