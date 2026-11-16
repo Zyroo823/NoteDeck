@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Express, Response } from "express";
 import { CodeChallengeMethod, OAuth2Client, type TokenPayload } from "google-auth-library";
 import { cleanPlainText } from "../src/lib/studyLogic";
+import { TERMS_VERSION } from "../src/lib/legal";
 import { readDb, writeDb, type DatabaseState, type UserRecord } from "./store";
 import { rateLimit } from "./rate-limit";
 
@@ -60,30 +61,73 @@ export function registerGoogleAuth(
     path: AUTH_PATH,
   };
 
-  app.get(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), (_req, res) => {
-    res.set("Cache-Control", "no-store");
-    if (!config) {
-      res.redirect("/login?google=unavailable");
-      return;
-    }
+  function startGoogleFlow(res: Response, intent: "login" | "signup"): string | null {
+    if (!config) return null;
 
     const state = crypto.randomBytes(32).toString("base64url");
     const nonce = crypto.randomBytes(32).toString("base64url");
     const verifier = crypto.randomBytes(32).toString("base64url");
     const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+    const termsAcceptedAt = intent === "signup" ? new Date().toISOString() : undefined;
     res.cookie(
       OAUTH_COOKIE,
-      { state, nonce, verifier, expiresAt: Date.now() + FLOW_DURATION_MS },
+      { state, nonce, verifier, intent, termsAcceptedAt, expiresAt: Date.now() + FLOW_DURATION_MS },
       { ...cookieOptions, signed: true, maxAge: FLOW_DURATION_MS }
     );
-    res.redirect(config.client.generateAuthUrl({
+    return config.client.generateAuthUrl({
       scope: ["openid", "email", "profile"],
       state,
       nonce,
       code_challenge: challenge,
       code_challenge_method: CodeChallengeMethod.S256,
       prompt: "select_account",
-    }));
+    });
+  }
+
+  app.get(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (req.query.intent === "signup") {
+      res.redirect("/signup?google=terms-required");
+      return;
+    }
+    if (!config) {
+      res.redirect("/login?google=unavailable");
+      return;
+    }
+
+    const authorizationUrl = startGoogleFlow(res, "login");
+    if (!authorizationUrl) {
+      res.redirect("/login?google=unavailable");
+      return;
+    }
+    res.redirect(authorizationUrl);
+  });
+
+  app.post(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const origin = req.get("origin");
+    const host = req.get("host");
+    if (!origin || !host || !["http", "https"].some((scheme) => origin === `${scheme}://${host}`)) {
+      res.status(403).json({ error: "Invalid request origin." });
+      return;
+    }
+
+    const intent = req.body?.intent === "signup" ? "signup" : "login";
+    if (intent === "signup" && req.body?.acceptTerms !== true) {
+      res.status(400).json({ error: "Agree to the Terms of Service before creating an account." });
+      return;
+    }
+    if (!config) {
+      res.status(503).json({ error: "Gmail sign-in is not set up yet." });
+      return;
+    }
+
+    const authorizationUrl = startGoogleFlow(res, intent);
+    if (!authorizationUrl) {
+      res.status(503).json({ error: "Gmail sign-in is not available." });
+      return;
+    }
+    res.json({ authorizationUrl });
   });
 
   app.get(CALLBACK_PATH, rateLimit("google-callback", 25, "Too many Gmail sign-in attempts. Try again shortly."), async (req, res) => {
@@ -93,7 +137,9 @@ export function registerGoogleAuth(
 
     if (!config || !flow || typeof flow.state !== "string" || flow.state !== req.query.state ||
         typeof flow.expiresAt !== "number" || Date.now() >= flow.expiresAt ||
-        typeof flow.verifier !== "string" || typeof flow.nonce !== "string") {
+        typeof flow.verifier !== "string" || typeof flow.nonce !== "string" ||
+        (flow.intent !== "login" && flow.intent !== "signup") ||
+        (flow.intent === "signup" && typeof flow.termsAcceptedAt !== "string")) {
       res.redirect("/login?google=expired");
       return;
     }
@@ -149,12 +195,18 @@ export function registerGoogleAuth(
           writeDb(db);
           user = existing;
         } else {
+          if (flow.intent !== "signup") {
+            res.redirect("/login?google=signup-required");
+            return;
+          }
           const name = cleanPlainText(identity.name ?? "").slice(0, 60);
           user = {
             id: `user-${crypto.randomUUID()}`,
             name: name || email.split("@")[0],
             email,
             googleSubject: identity.sub,
+            termsAcceptedAt: flow.termsAcceptedAt as string,
+            termsVersion: TERMS_VERSION,
             createdAt: new Date().toISOString(),
           } satisfies UserRecord;
           db.users.push(user);

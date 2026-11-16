@@ -109,10 +109,10 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
           } ${flipped ? "rotate-y-180" : ""}`}
         >
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 backface-hidden">
-            <span className="absolute left-6 top-5 text-xs font-medium text-slate-400">
+            <span className="absolute left-6 top-5 text-xs font-medium text-slate-500">
               Term
             </span>
-            <span className="absolute right-6 top-5 text-xs text-slate-400">
+            <span className="absolute right-6 top-5 text-xs text-slate-500">
               Click or Space to flip
             </span>
             <p className="max-w-xl text-2xl font-bold leading-snug text-slate-900 dark:text-white sm:text-3xl">
@@ -124,7 +124,7 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
             <span className="absolute left-6 top-5 text-xs font-medium text-[#2DD4BF]">
               Definition
             </span>
-            <span className="absolute right-6 top-5 text-xs text-slate-400">
+            <span className="absolute right-6 top-5 text-xs text-slate-500">
               Click or Space to flip
             </span>
             <p className="max-w-xl text-lg leading-relaxed text-slate-700 dark:text-slate-100 sm:text-xl">

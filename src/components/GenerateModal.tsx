@@ -325,7 +325,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                           })
                         }
                         aria-label={`Remove generated card ${idx + 1}`}
-                        className="flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:text-red-500 disabled:opacity-30 sm:col-span-1"
+                        className="flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:text-red-500 disabled:opacity-30 sm:col-span-1"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -379,7 +379,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                   className={`border-b-2 pb-3 text-sm font-medium whitespace-nowrap transition ${
                     tab === "gdrive"
                       ? "border-[#5B6CFA] text-slate-900 dark:text-white"
-                      : "border-transparent text-slate-400"
+                      : "border-transparent text-slate-500"
                   }`}
                 >
                   Google Drive <span className="ml-1 text-xs">(Coming soon)</span>
@@ -393,7 +393,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                   className={`border-b-2 pb-3 text-sm font-medium whitespace-nowrap transition ${
                     tab === "record"
                       ? "border-[#5B6CFA] text-slate-900 dark:text-white"
-                      : "border-transparent text-slate-400"
+                      : "border-transparent text-slate-500"
                   }`}
                 >
                   Record lecture <span className="ml-1 text-xs">(Coming soon)</span>
@@ -411,7 +411,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
                     placeholder="Paste your lecture notes, reading excerpt, or outline here (at least 30 characters)..."
-                    className="w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-500"
+                    className="w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
                     <span>Minimum 30 characters</span>
@@ -467,14 +467,14 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                         >
                           <span className="truncate font-medium">{file.name}</span>
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono-nums text-xs text-slate-400">
+                            <span className="font-mono-nums text-xs text-slate-500">
                               {(file.size / 1024).toFixed(0)} KB
                             </span>
                             <button
                               type="button"
                               onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))}
                               aria-label={`Remove ${file.name}`}
-                              className="text-slate-400 hover:text-red-500"
+                              className="text-slate-500 hover:text-red-500"
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -537,7 +537,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               type="button"
               onClick={handleSavePreview}
               disabled={saving}
-              className="rounded-full bg-[#5B6CFA] px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:opacity-60"
+              className="rounded-full bg-[#494bd2] px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:opacity-60"
             >
               {saving ? "Saving..." : "Save to Library"}
             </button>
@@ -546,7 +546,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               type="button"
               onClick={handleGenerate}
               disabled={!canGenerate}
-              className="rounded-full bg-[#5B6CFA] px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-[#494bd2] px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {generating ? "Generating..." : "Generate"}
             </button>

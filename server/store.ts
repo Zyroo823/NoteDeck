@@ -12,6 +12,8 @@ export interface UserRecord {
   role?: "admin" | "user";
   suspended?: boolean;
   sessionVersion?: number;
+  termsAcceptedAt?: string;
+  termsVersion?: string;
   createdAt: string;
 }
 

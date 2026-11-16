@@ -8,6 +8,7 @@ interface SettingsViewProps {
   theme: "dark" | "light";
   onToggleTheme: () => void;
   onUserUpdated: (user: AuthUser) => void;
+  onAccountDeleted: () => void;
 }
 
 export function SettingsView({
@@ -15,11 +16,15 @@ export function SettingsView({
   theme,
   onToggleTheme,
   onUserUpdated,
+  onAccountDeleted,
 }: SettingsViewProps) {
   const [name, setName] = useState(user.name);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [deleteEmail, setDeleteEmail] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,6 +55,29 @@ export function SettingsView({
       setErrorMessage("Network error while saving profile.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDeleteError("");
+    setDeletingAccount(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: deleteEmail }),
+      });
+      const data = (await res.json()) as { error?: string; ok?: boolean };
+      if (!res.ok || !data.ok) {
+        setDeleteError(data.error ?? "Could not delete your account.");
+        return;
+      }
+      onAccountDeleted();
+    } catch {
+      setDeleteError("Network error. Your account was not confirmed as deleted; try again.");
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -113,7 +141,7 @@ export function SettingsView({
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl bg-[#5B6CFA] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#4B5CE8] disabled:opacity-60"
+            className="rounded-xl bg-[#494bd2] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#4B5CE8] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#141926]"
           >
             {saving ? "Saving..." : "Save profile"}
           </button>
@@ -131,11 +159,53 @@ export function SettingsView({
         <button
           type="button"
           onClick={onToggleTheme}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium whitespace-nowrap transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-[#1C2336]"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium whitespace-nowrap transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:hover:bg-[#1C2336]"
         >
           {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
           Switch to {theme === "dark" ? "light" : "dark"} mode
         </button>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-[#141926]">
+        <h2 className="text-base font-bold">Your data</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Download a copy of your account and study materials, or permanently remove your NoteDeck account and its linked materials from the active app data file.
+        </p>
+        <a href="/api/account/export" className="mt-4 inline-flex rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 underline-offset-4 hover:bg-slate-100 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-[#1C2336]">
+          Download my data (JSON)
+        </a>
+
+        <div className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-800">
+          <h3 className="font-semibold text-red-700 dark:text-red-300">Delete account</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            This permanently removes your account, folders, flashcards, guides, quiz attempts, and generation records from NoteDeck’s active data file. It cannot be undone. It does not delete separate copies held by Google or hosting providers.
+          </p>
+          {deleteError ? (
+            <div role="alert" className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+              {deleteError}
+            </div>
+          ) : null}
+          <form onSubmit={handleDeleteAccount} className="mt-4 space-y-3">
+            <label htmlFor="delete-account-email" className="block text-sm font-medium">
+              Type <span className="font-mono">{user.email}</span> to confirm
+            </label>
+            <input
+              id="delete-account-email"
+              type="email"
+              autoComplete="email"
+              value={deleteEmail}
+              onChange={(event) => setDeleteEmail(event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
+            />
+            <button
+              type="submit"
+              disabled={deletingAccount || deleteEmail.trim().toLowerCase() !== user.email.toLowerCase()}
+              className="rounded-xl bg-red-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#141926]"
+            >
+              {deletingAccount ? "Deleting account…" : "Permanently delete my account"}
+            </button>
+          </form>
+        </div>
       </section>
     </div>
   );

@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 import path from "node:path";
 import {
   cardInputSchema,
+  accountDeletionSchema,
   folderItemInputSchema,
   folderNameSchema,
   loginSchema,
@@ -33,6 +34,7 @@ import { generateStudyMaterials } from "./server/ai";
 import { registerGoogleAuth } from "./server/google-auth";
 import { rateLimit } from "./server/rate-limit";
 import { openStudyData } from "./server/study-data";
+import { TERMS_VERSION } from "./src/lib/legal";
 
 const COOKIE_NAME = "notedeck_session";
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -50,7 +52,7 @@ interface AuthedRequest extends Request {
   userId?: string;
 }
 
-function setSessionCookie(res: Response, userId: string, secure = false): void {
+function setSessionCookie(res: Response, userId: string, secure = process.env.NODE_ENV === "production"): void {
   const token = createSessionToken(userId);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
@@ -104,6 +106,8 @@ async function startServer() {
       name: cleanPlainText(parsed.data.name),
       email: emailLower,
       passwordHash: hashPassword(parsed.data.password),
+      termsAcceptedAt: new Date().toISOString(),
+      termsVersion: TERMS_VERSION,
       createdAt: new Date().toISOString(),
     };
 
@@ -179,6 +183,89 @@ async function startServer() {
     user.name = cleanPlainText(parsed.data.name);
     writeDb(db);
     res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" } });
+  });
+
+  app.get("/api/account/export", requireAuth, (req: AuthedRequest, res) => {
+    const db = readDb();
+    const user = db.users.find((record) => record.id === req.userId);
+    if (!user) {
+      res.status(404).json({ error: "Account not found." });
+      return;
+    }
+
+    const studySets = db.studySets.filter((record) => record.userId === user.id);
+    const setIds = new Set(studySets.map((record) => record.id));
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        termsVersion: user.termsVersion,
+        termsAcceptedAt: user.termsAcceptedAt,
+        createdAt: user.createdAt,
+      },
+      folders: (db.folders ?? []).filter((record) => record.userId === user.id),
+      studySets,
+      cards: db.cards.filter((record) => setIds.has(record.setId)),
+      studyGuides: db.studyGuides.filter((record) => record.userId === user.id),
+      quizAttempts: db.quizAttempts.filter((record) => record.userId === user.id),
+      generationJobs: db.generationJobs
+        .filter((record) => record.userId === user.id)
+        .map(({ id, status, sourceKind, previewResult, resultSetId, resultGuideId, createdAt, updatedAt }) =>
+          ({ id, status, sourceKind, previewResult, resultSetId, resultGuideId, createdAt, updatedAt })),
+    };
+
+    res.set({
+      "Cache-Control": "private, no-store",
+      "Content-Disposition": `attachment; filename="notedeck-data-${new Date().toISOString().slice(0, 10)}.json"`,
+    });
+    res.json(exportData);
+  });
+
+  app.delete("/api/account", requireAuth, (req: AuthedRequest, res) => {
+    const origin = req.get("origin");
+    const host = req.get("host");
+    if (!origin || !host || !["http", "https"].some((scheme) => origin === `${scheme}://${host}`)) {
+      res.status(403).json({ error: "Invalid request origin." });
+      return;
+    }
+
+    const parsed = accountDeletionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid deletion confirmation." });
+      return;
+    }
+
+    const db = readDb();
+    const user = db.users.find((record) => record.id === req.userId);
+    if (!user) {
+      res.status(404).json({ error: "Account not found." });
+      return;
+    }
+    if (parsed.data.email.toLowerCase() !== user.email.toLowerCase()) {
+      res.status(400).json({ error: "Enter the email address on your account to confirm deletion." });
+      return;
+    }
+
+    const setIds = new Set(db.studySets.filter((record) => record.userId === user.id).map((record) => record.id));
+    db.users = db.users.filter((record) => record.id !== user.id);
+    db.folders = (db.folders ?? []).filter((record) => record.userId !== user.id);
+    db.studySets = db.studySets.filter((record) => record.userId !== user.id);
+    db.cards = db.cards.filter((record) => !setIds.has(record.setId));
+    db.studyGuides = db.studyGuides.filter((record) => record.userId !== user.id);
+    db.quizAttempts = db.quizAttempts.filter((record) => record.userId !== user.id);
+    db.generationJobs = db.generationJobs.filter((record) => record.userId !== user.id);
+    db.adminAudit = (db.adminAudit ?? []).filter((record) => record.actorId !== user.id && record.targetId !== user.id);
+    try {
+      writeDb(db);
+    } catch {
+      res.status(500).json({ error: "Account deletion could not be confirmed. Please try again." });
+      return;
+    }
+
+    res.clearCookie(COOKIE_NAME, { path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+    res.json({ ok: true });
   });
 
   app.get("/api/admin/users", requireAuth, (req: AuthedRequest, res) => {
@@ -932,8 +1019,12 @@ async function startServer() {
   } else {
     const distDir = path.resolve(process.cwd(), "dist");
     app.use(express.static(distDir));
+    app.use("/api", (_req, res) => {
+      res.status(404).json({ error: "API route not found." });
+    });
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distDir, "index.html"));
+      const knownPage = /^\/(?:$|login\/?$|signup\/?$|privacy\/?$|terms\/?$|cookies\/?$|library\/?$|practice-test\/?$|settings\/?$|admin\/?$|sets\/new\/?$|sets\/[^/]+(?:\/edit)?\/?$|guides\/[^/]+\/?$|folders\/[^/]+\/?$)/.test(_req.path);
+      res.status(knownPage ? 200 : 404).sendFile(path.join(distDir, "index.html"));
     });
   }
 

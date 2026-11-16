@@ -70,6 +70,8 @@ NoteDeck's local JSON store enforces study record ownership in application code.
 
 Administrators can open **Manage users** from the profile menu to change roles and suspend or restore accounts. Suspending an account invalidates its existing sessions. Role and access changes are recorded in the local database. Administrators cannot change their own role or suspend their own account.
 
+For a fresh database, set `BOOTSTRAP_ADMIN_EMAIL` to the owner's Gmail address. The first successful, verified Google sign-in for that exact address becomes administrator only if no active administrator exists. This setting does not grant administrator access through unverified password signup. Remove the bootstrap setting after the first administrator is established in durable storage.
+
 ## Project structure
 
 ```text
@@ -93,3 +95,9 @@ docs/agents/  Project guidance for installed agent skills
 NoteDeck stores account and study data locally in `.data/db.json`. This directory and `.env` files are ignored by Git. The app supports up to two uploaded files per generation request, with a limit of 25 MB per file. `DAILY_GENERATION_LIMIT` can be set in the environment; the default is five generations per user per day.
 
 The current storage and session configuration is intended for local development. Review persistence, session secrets, and deployment security before hosting the app for others.
+
+## Privacy and legal status
+
+New account signup requires agreement to the current Terms of Service version. Settings includes a JSON data export and account deletion; deletion removes account-linked rows from the active app data file and does not request deletion from Google or hosting providers. The app uses essential sign-in cookies only, so it currently has no cookie consent banner; theme preference is stored in local storage.
+
+The Privacy Policy and Terms are pre-launch drafts. The operator is John Mar Aledon, based in the Philippines, and the privacy contact is johnmaraledon823@gmail.com. Supported countries, age policy, and inactive-account retention still need owner decisions and legal review. The current app has no paid plans, checkout, marketing email subscriptions, public reviews, or third-party analytics. Do not treat these pages or code changes as a guarantee against legal claims.

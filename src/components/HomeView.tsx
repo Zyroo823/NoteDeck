@@ -105,7 +105,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
               <button
                 type="button"
                 onClick={onOpenGenerate}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#5B6CFA] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#494bd2] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
               >
                 <Sparkles className="h-4 w-4" />
                 Generate with AI
@@ -164,7 +164,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
                           : `/sets/${item.id}`
                       )
                     }
-                    className="rounded-full bg-[#5B6CFA] px-4 py-2 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
+                    className="rounded-full bg-[#494bd2] px-4 py-2 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
                   >
                     {item.lastScorePct !== null ? "Start another test" : "Continue"}
                   </button>
@@ -188,7 +188,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
             <button
               type="button"
               onClick={() => onNavigate("/library")}
-              className="text-sm font-semibold text-[#5B6CFA] hover:underline whitespace-nowrap"
+              className="text-sm font-semibold text-[#494bd2] hover:underline whitespace-nowrap dark:text-[#a5b4fc]"
             >
               View all
             </button>

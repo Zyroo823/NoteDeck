@@ -4,6 +4,11 @@ export const signupSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(60, "Name is too long"),
   email: z.string().trim().email("Enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters").max(72, "Password is too long"),
+  acceptTerms: z.literal(true, "You must agree to the Terms of Service to create an account."),
+});
+
+export const accountDeletionSchema = z.object({
+  email: z.string().trim().email("Enter your account email to confirm deletion."),
 });
 
 export const loginSchema = z.object({

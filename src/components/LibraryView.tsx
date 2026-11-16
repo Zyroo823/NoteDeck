@@ -128,7 +128,7 @@ export function LibraryView({
           <button
             type="button"
             onClick={() => onNavigate("/sets/new")}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#5B6CFA] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#494bd2] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
           >
             <Plus className="h-4 w-4" />
             New flashcard set
@@ -184,14 +184,14 @@ export function LibraryView({
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
             aria-label="Filter library by title"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter by title..."
-            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-500"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-500"
           />
         </div>
       </div>
@@ -214,7 +214,7 @@ export function LibraryView({
         </div>
       ) : isEmpty ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-[#141926]">
-          <Layers className="mx-auto h-8 w-8 text-slate-400" />
+          <Layers className="mx-auto h-8 w-8 text-slate-500" />
           <h2 className="mt-3 text-lg font-semibold">No matching items found</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {query.trim()
@@ -225,7 +225,7 @@ export function LibraryView({
             <button
               type="button"
               onClick={() => onNavigate("/sets/new")}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#5B6CFA] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B5CE8]"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#494bd2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B5CE8]"
             >
               <Plus className="h-4 w-4" />
               Create flashcard set

@@ -145,7 +145,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-[#5B6CFA] px-5 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:opacity-60"
+          className="rounded-xl bg-[#494bd2] px-5 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:opacity-60"
         >
           {saving ? "Saving..." : mode === "create" ? "Create set" : "Save changes"}
         </button>
@@ -170,7 +170,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Example: Biology Chapter 4 Cell Transport"
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
         />
       </div>
 
@@ -189,7 +189,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
                 onClick={() => removeRow(index)}
                 disabled={cards.length <= 1}
                 aria-label={`Remove card ${index + 1}`}
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-red-950/40 dark:hover:text-red-400"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -209,7 +209,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
                   value={card.term}
                   onChange={(e) => updateRow(index, "term", e.target.value)}
                   placeholder="Enter term"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
 
@@ -226,7 +226,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
                   value={card.definition}
                   onChange={(e) => updateRow(index, "definition", e.target.value)}
                   placeholder="Enter definition"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
             </div>
@@ -238,7 +238,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
         <button
           type="button"
           onClick={addRow}
-          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 whitespace-nowrap transition hover:border-[#5B6CFA] hover:text-[#5B6CFA] dark:border-slate-700 dark:text-slate-200"
+          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 whitespace-nowrap transition hover:border-[#494bd2] hover:text-[#494bd2] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#a5b4fc] dark:hover:text-[#a5b4fc]"
         >
           <Plus className="h-4 w-4" />
           Add card
@@ -247,7 +247,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-[#5B6CFA] px-6 py-3 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:opacity-60"
+          className="rounded-xl bg-[#494bd2] px-6 py-3 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:opacity-60"
         >
           {saving ? "Saving..." : mode === "create" ? "Create set" : "Save changes"}
         </button>

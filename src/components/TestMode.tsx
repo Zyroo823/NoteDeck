@@ -93,7 +93,7 @@ export function TestMode({ setId, cards, onAttemptSaved }: TestModeProps) {
             <button
               type="button"
               onClick={handleRetake}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#5B6CFA] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#494bd2] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
             >
               <RotateCcw className="h-4 w-4" />
               Retake test
@@ -117,7 +117,7 @@ export function TestMode({ setId, cards, onAttemptSaved }: TestModeProps) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <span className="font-mono-nums text-xs font-medium text-slate-400">
+                  <span className="font-mono-nums text-xs font-medium text-slate-500">
                     Question {idx + 1}
                   </span>
                   <h3 className="mt-0.5 text-base font-bold text-slate-900 dark:text-white">
@@ -169,7 +169,7 @@ export function TestMode({ setId, cards, onAttemptSaved }: TestModeProps) {
         <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
           Choose the matching definition for each term
         </span>
-        <span className="font-mono-nums text-sm font-semibold text-[#5B6CFA]">
+        <span className="font-mono-nums text-sm font-semibold text-[#494bd2] dark:text-[#a5b4fc]">
           {answeredCount} / {questions.length} answered
         </span>
       </div>
@@ -183,7 +183,7 @@ export function TestMode({ setId, cards, onAttemptSaved }: TestModeProps) {
             <legend className="sr-only">
               Question {qIdx + 1}: {question.prompt}
             </legend>
-            <p className="font-mono-nums text-xs font-medium text-slate-400">
+            <p className="font-mono-nums text-xs font-medium text-slate-500">
               Question {qIdx + 1} of {questions.length}
             </p>
             <h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
@@ -219,7 +219,7 @@ export function TestMode({ setId, cards, onAttemptSaved }: TestModeProps) {
           type="button"
           onClick={handleSubmitQuiz}
           disabled={!allAnswered}
-          className="rounded-xl bg-[#5B6CFA] px-6 py-3 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl bg-[#494bd2] px-6 py-3 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Submit test ({answeredCount}/{questions.length})
         </button>

@@ -20,7 +20,7 @@ interface FolderItem {
 
 const panel = "rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-[#141926]";
 const field = "h-11 min-w-0 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm focus-visible:outline-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-[#0B0E17]";
-const primary = "rounded-xl bg-[#5B6CFA] px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white hover:bg-[#4B5CE8] disabled:opacity-50";
+const primary = "rounded-xl bg-[#494bd2] px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white hover:bg-[#4B5CE8] disabled:opacity-50";
 const secondary = "inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-[#1C2336]";
 
 export function FolderView({ folder, onNavigate, onSaved, onDeleted }: FolderViewProps) {

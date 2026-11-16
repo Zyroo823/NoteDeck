@@ -139,7 +139,7 @@ export function StudyGuideView({ guideId, onNavigate }: StudyGuideViewProps) {
         <button
           type="button"
           onClick={() => onNavigate("/library")}
-          className="mt-4 rounded-xl bg-[#5B6CFA] px-4 py-2 text-sm font-semibold text-white"
+          className="mt-4 rounded-xl bg-[#494bd2] px-4 py-2 text-sm font-semibold text-white"
         >
           Back to Your library
         </button>
@@ -326,7 +326,7 @@ export function StudyGuideView({ guideId, onNavigate }: StudyGuideViewProps) {
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="rounded-xl bg-[#5B6CFA] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B5CE8]"
+              className="rounded-xl bg-[#494bd2] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B5CE8]"
             >
               {saving ? "Saving..." : "Save guide"}
             </button>

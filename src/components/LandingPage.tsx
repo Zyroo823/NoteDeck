@@ -57,6 +57,9 @@ export function LandingPage({ theme, onToggleTheme }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0E17] dark:text-slate-100">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-slate-900 focus:shadow-lg">
+        Skip to content
+      </a>
       <header className="border-b border-slate-200 dark:border-slate-800">
         <nav aria-label="Main navigation" className="mx-auto flex min-h-17 max-w-7xl items-center gap-2 px-3 sm:gap-8 sm:px-8">
           <a href="/" className={`flex items-center gap-2.5 rounded-md text-lg font-extrabold tracking-tight ${focus}`}>
@@ -75,7 +78,7 @@ export function LandingPage({ theme, onToggleTheme }: LandingPageProps) {
         </nav>
       </header>
 
-      <main className="mx-auto max-w-7xl px-5 sm:px-8">
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-7xl px-5 sm:px-8 focus-visible:outline-none">
         <section aria-labelledby="landing-title" className="mx-auto flex max-w-3xl flex-col items-center pb-12 pt-14 text-center sm:pb-16 sm:pt-20">
           <h1 id="landing-title" className="text-[clamp(2.6rem,7vw,4.5rem)] leading-[1.05] font-extrabold tracking-[-0.065em]">
             Turn your notes into<br className="hidden sm:block" /> better study sessions.
@@ -122,7 +125,12 @@ export function LandingPage({ theme, onToggleTheme }: LandingPageProps) {
       <footer className="border-t border-slate-200 dark:border-slate-800">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-6 text-sm sm:px-8">
           <span className="font-extrabold">NoteDeck</span>
-          <a href="/login" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Log in</a>
+          <div className="flex flex-wrap items-center gap-4">
+            <a href="/privacy" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Privacy</a>
+            <a href="/terms" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Terms</a>
+            <a href="/cookies" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Cookies</a>
+            <a href="/login" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Log in</a>
+          </div>
         </div>
       </footer>
     </div>

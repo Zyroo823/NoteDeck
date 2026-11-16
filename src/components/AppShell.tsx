@@ -93,6 +93,9 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0E17] dark:text-slate-100">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-slate-900 focus:shadow-lg">
+        Skip to content
+      </a>
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-[#0B0E17]/95">
         <button
           type="button"
@@ -100,7 +103,7 @@ export function AppShell({
           aria-label="Go to NoteDeck Home"
           className="flex items-center gap-2.5 rounded-xl py-1.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#5B6CFA] text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#494bd2] text-white">
             <BookOpen className="h-4 w-4" />
           </span>
           <span className="hidden text-base font-bold tracking-tight sm:inline">NoteDeck</span>
@@ -111,7 +114,7 @@ export function AppShell({
             Search your library
           </label>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               id="top-search-library"
               type="search"
@@ -133,7 +136,7 @@ export function AppShell({
               }}
               aria-label="Create new study item"
               aria-expanded={createOpen}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#5B6CFA] text-white transition hover:bg-[#4B5CE8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0B0E17]"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#494bd2] text-white transition hover:bg-[#4B5CE8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0B0E17]"
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -275,8 +278,13 @@ export function AppShell({
       <div className="flex min-h-[calc(100dvh-4rem)]">
         <AppSidebar key={user.id} folders={folders} foldersFailed={foldersFailed} currentPath={currentPath} onNavigate={onNavigate} />
 
-        <main className="min-w-0 flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-6 lg:px-10">{children}</main>
+        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus-visible:outline-none sm:px-6 md:pb-6 lg:px-10">{children}</main>
       </div>
+      <footer className="flex flex-wrap justify-center gap-5 border-t border-slate-200 px-4 py-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <a href="/privacy" className="hover:underline focus-visible:underline">Privacy Policy</a>
+        <a href="/terms" className="hover:underline focus-visible:underline">Terms of Service</a>
+        <a href="/cookies" className="hover:underline focus-visible:underline">Cookie Policy</a>
+      </footer>
     </div>
   );
 }

@@ -198,7 +198,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
         <button
           type="button"
           onClick={() => onNavigate("/library")}
-          className="mt-4 rounded-xl bg-[#5B6CFA] px-4 py-2 text-sm font-semibold text-white"
+          className="mt-4 rounded-xl bg-[#494bd2] px-4 py-2 text-sm font-semibold text-white"
         >
           Back to Your library
         </button>
@@ -264,7 +264,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
           onClick={() => setMode("flashcards")}
           className={`flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-semibold whitespace-nowrap transition ${
             mode === "flashcards"
-              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#5B6CFA]"
+              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#494bd2] dark:text-[#a5b4fc]"
               : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
           }`}
         >
@@ -279,7 +279,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
           onClick={() => setMode("test")}
           className={`flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-semibold whitespace-nowrap transition ${
             mode === "test"
-              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#5B6CFA]"
+              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#494bd2] dark:text-[#a5b4fc]"
               : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
           }`}
         >
@@ -289,7 +289,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
 
         <div
           aria-disabled="true"
-          className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/60 text-sm font-medium text-slate-400 whitespace-nowrap dark:border-slate-800/80 dark:bg-[#141926]/50"
+          className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/60 text-sm font-medium text-slate-500 whitespace-nowrap dark:border-slate-800/80 dark:bg-[#141926]/50"
         >
           <span>Learn</span>
           <span className="text-xs">(Phase 2)</span>
@@ -380,7 +380,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
               <button
                 type="submit"
                 disabled={savingCard}
-                className="rounded-xl bg-[#5B6CFA] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4B5CE8]"
+                className="rounded-xl bg-[#494bd2] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4B5CE8]"
               >
                 {savingCard ? "Adding..." : "Save card"}
               </button>
@@ -444,7 +444,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                         type="button"
                         disabled={savingCard}
                         onClick={() => handleSaveInlineCard(card.id)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[#5B6CFA] px-3 py-1.5 text-xs font-semibold text-white"
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#494bd2] px-3 py-1.5 text-xs font-semibold text-white"
                       >
                         <Check className="h-3.5 w-3.5" />
                         Save
@@ -467,7 +467,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                         type="button"
                         onClick={() => startEditCard(card)}
                         aria-label={`Edit card "${card.term}"`}
-                        className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-[#1C2336] dark:hover:text-white"
+                        className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-[#1C2336] dark:hover:text-white"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -475,7 +475,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                         type="button"
                         onClick={() => setDeleteCardTarget(card)}
                         aria-label={`Delete card "${card.term}"`}
-                        className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                        className="rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

@@ -13,6 +13,7 @@ import { AdminView } from "@/src/components/AdminView";
 import { GenerateModal } from "@/src/components/GenerateModal";
 import { FolderView } from "@/src/components/FolderView";
 import { PracticeTestView } from "@/src/components/PracticeTestView";
+import { LegalPage, NotFoundPage } from "@/src/components/LegalPages";
 import type { AuthUser, FolderSummary } from "@/src/types/api";
 
 function getInitialTheme(): "dark" | "light" {
@@ -23,6 +24,11 @@ function getInitialTheme(): "dark" | "light" {
 function readCurrentUrlPath(): string {
   if (typeof window === "undefined") return "/";
   return `${window.location.pathname}${window.location.search}`;
+}
+
+function isKnownPath(pathname: string): boolean {
+  return ["/", "/login", "/signup", "/privacy", "/terms", "/cookies", "/library", "/practice-test", "/settings", "/admin", "/sets/new"].includes(pathname) ||
+    /^\/(?:sets\/[^/]+(?:\/edit)?|guides\/[^/]+|folders\/[^/]+)$/.test(pathname);
 }
 
 export default function App() {
@@ -122,6 +128,19 @@ export default function App() {
     navigate("/");
   }
 
+  const parsedUrl = new URL(currentPath, "http://localhost");
+  const pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/";
+
+  if (pathname === "/privacy" || pathname === "/terms" || pathname === "/cookies") {
+    const document = pathname.slice(1) as "privacy" | "terms" | "cookies";
+    return <LegalPage document={document} />;
+  }
+
+
+  if (!isKnownPath(pathname)) {
+    return <NotFoundPage onHome={() => navigate("/")} />;
+  }
+
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0B0E17]">
@@ -129,9 +148,6 @@ export default function App() {
       </div>
     );
   }
-
-  const parsedUrl = new URL(currentPath, "http://localhost");
-  const pathname = parsedUrl.pathname;
 
   if (!user && pathname === "/") return <LandingPage theme={theme} onToggleTheme={toggleTheme} />;
 
@@ -251,6 +267,12 @@ export default function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onUserUpdated={(updated) => setUser(updated)}
+          onAccountDeleted={() => {
+            setUser(null);
+            setFolderList(null);
+            setAuthMode("login");
+            navigate("/");
+          }}
         />
       );
     }
@@ -261,7 +283,10 @@ export default function App() {
         : <div role="alert" className="mx-auto max-w-4xl">Administrator access required.</div>;
     }
 
-    return <HomeView onNavigate={navigate} onOpenGenerate={() => setGenerateOpen(true)} />;
+    if (pathname === "/") {
+      return <HomeView onNavigate={navigate} onOpenGenerate={() => setGenerateOpen(true)} />;
+    }
+    return <NotFoundPage onHome={() => navigate("/")} />;
   }
 
   return (

@@ -58,7 +58,7 @@ export function PracticeTestView({ onNavigate }: { onNavigate: (path: string) =>
               ))}
             </select>
             <button type="submit" disabled={!deckId}
-              className="rounded-xl bg-[#5B6CFA] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#4B5CE8] disabled:opacity-50">
+              className="rounded-xl bg-[#494bd2] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#4B5CE8] disabled:opacity-50">
               Start test
             </button>
           </form>
