@@ -2,13 +2,24 @@ import crypto from "node:crypto";
 import type { Express, Response } from "express";
 import { CodeChallengeMethod, OAuth2Client, type TokenPayload } from "google-auth-library";
 import { cleanPlainText } from "../src/lib/studyLogic";
-import { readDb, writeDb, type UserRecord } from "./store";
+import { readDb, writeDb, type DatabaseState, type UserRecord } from "./store";
 import { rateLimit } from "./rate-limit";
 
 const AUTH_PATH = "/api/auth/google";
 const CALLBACK_PATH = `${AUTH_PATH}/callback`;
 const OAUTH_COOKIE = "notedeck_google_login";
 const FLOW_DURATION_MS = 10 * 60 * 1000;
+
+export function bootstrapVerifiedAdmin(db: DatabaseState, user: UserRecord, verifiedEmail: string, configuredEmail: string | undefined): boolean {
+  const targetEmail = configuredEmail?.trim().toLowerCase();
+  if (!targetEmail || verifiedEmail !== targetEmail || user.email.toLowerCase() !== verifiedEmail ||
+      !user.googleSubject || user.suspended || user.role === "admin" ||
+      db.users.some((record) => record.role === "admin" && !record.suspended)) {
+    return false;
+  }
+  user.role = "admin";
+  return true;
+}
 
 function getGoogleConfig() {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
@@ -155,6 +166,9 @@ export function registerGoogleAuth(
         res.redirect("/login?google=suspended");
         return;
       }
+      if (bootstrapVerifiedAdmin(db, user, email, process.env.BOOTSTRAP_ADMIN_EMAIL)) {
+        writeDb(db);
+      }
       setSessionCookie(res, user.id, config.secure);
       res.redirect("/");
     } catch {
@@ -162,3 +176,4 @@ export function registerGoogleAuth(
     }
   });
 }
+
