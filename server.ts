@@ -1219,7 +1219,9 @@ async function startServer() {
   });
 }
 
-startServer().catch(() => {
-  console.error("NoteDeck failed to start. Check the server environment and database setup.");
+startServer().catch((error: unknown) => {
+  const code = error instanceof Error && "code" in error && typeof error.code === "string" &&
+    /^[A-Z0-9_]{3,40}$/.test(error.code) ? error.code : null;
+  console.error(`NoteDeck failed to start${code ? ` (${code})` : ""}. Check the server environment and database setup.`);
   process.exit(1);
 });
