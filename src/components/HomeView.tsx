@@ -12,6 +12,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
   const [recents, setRecents] = useState<RecentActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [carouselEdges, setCarouselEdges] = useState({ previous: false, next: false });
   const carouselRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -46,13 +47,35 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+    function update() {
+      if (!carousel) return;
+      const { scrollWidth, clientWidth, scrollLeft } = carousel;
+      setCarouselEdges({ previous: scrollLeft > 2, next: scrollWidth - clientWidth - scrollLeft > 2 });
+    }
+    const observer = new ResizeObserver(update);
+    observer.observe(carousel);
+    carousel.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => {
+      observer.disconnect();
+      carousel.removeEventListener("scroll", update);
+    };
+  }, [loading, jumpBackIn]);
+
   function scrollCarousel(direction: -1 | 1) {
-    if (!carouselRef.current) return;
-    carouselRef.current.scrollBy({ left: direction * 340, behavior: "smooth" });
+    const carousel = carouselRef.current;
+    const card = carousel?.firstElementChild;
+    if (!carousel || !card) return;
+    const gap = Number.parseFloat(getComputedStyle(carousel).columnGap) || 0;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    carousel.scrollBy({ left: direction * (card.getBoundingClientRect().width + gap), behavior: reduceMotion ? "instant" : "smooth" });
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10">
+    <div className="space-y-8">
       {errorMessage ? (
         <div
           role="alert"
@@ -64,25 +87,27 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
 
       <section aria-labelledby="jump-back-heading" className="space-y-4">
         <div className="flex items-center justify-between gap-4">
-          <h1 id="jump-back-heading" className="text-xl font-bold tracking-tight">
+          <h1 id="jump-back-heading" className="text-2xl font-bold tracking-tight">
             Jump back in
           </h1>
 
-          {jumpBackIn.length > 1 ? (
+          {carouselEdges.previous || carouselEdges.next ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => scrollCarousel(-1)}
+                disabled={!carouselEdges.previous}
                 aria-label="Scroll carousel left"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
+                className="flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition enabled:hover:bg-slate-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:enabled:hover:bg-[#1C2336]"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => scrollCarousel(1)}
+                disabled={!carouselEdges.next}
                 aria-label="Scroll carousel right"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
+                className="flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition enabled:hover:bg-slate-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:enabled:hover:bg-[#1C2336]"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -96,7 +121,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
             <div className="h-44 animate-pulse rounded-2xl bg-slate-200 dark:bg-[#141926]" />
           </div>
         ) : jumpBackIn.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 dark:border-slate-800 dark:bg-[#141926]">
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 sm:p-8 dark:border-slate-800 dark:bg-[#141926]">
             <h2 className="text-lg font-bold">Start building your study library</h2>
             <p className="mt-1 max-w-xl text-sm text-slate-600 dark:text-slate-400">
               Create flashcards manually or paste your lecture notes and slides to generate flashcards and a study guide automatically.
@@ -123,12 +148,12 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
         ) : (
           <div
             ref={carouselRef}
-            className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2"
+            className="flex snap-x snap-mandatory scroll-px-0.5 gap-4 overflow-x-auto px-0.5 pb-1 [scrollbar-width:none]"
           >
             {jumpBackIn.map((item) => (
               <article
                 key={item.id}
-                className="flex min-w-[290px] max-w-[380px] flex-1 shrink-0 snap-start flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-[#141926]"
+                className="flex min-w-0 shrink-0 basis-full snap-start flex-col justify-between sm:min-w-[290px] sm:max-w-[380px] sm:flex-1 sm:basis-auto rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-[#141926]"
               >
                 <div>
                   <h2 className="line-clamp-2 text-lg font-bold leading-snug text-slate-900 dark:text-white">
@@ -154,7 +179,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
                   </p>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between gap-3">
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -169,7 +194,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
                     {item.lastScorePct !== null ? "Start another test" : "Continue"}
                   </button>
 
-                  <span className="font-mono-nums text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-mono-nums text-xs text-slate-600 dark:text-slate-400">
                     {item.cardCount} {item.cardCount === 1 ? "card" : "cards"}
                   </span>
                 </div>
@@ -203,7 +228,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
             <div className="h-16 animate-pulse rounded-xl bg-slate-200 dark:bg-[#141926]" />
           </div>
         ) : recents.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Recent flashcard sets and study guides will appear here once created.
           </p>
         ) : (
@@ -235,7 +260,7 @@ export function HomeView({ onNavigate, onOpenGenerate }: HomeViewProps) {
                   <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
                     {item.title}
                   </p>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                     <span className="font-mono-nums">
                       {item.kind === "set"
                         ? `${item.cardCount} ${item.cardCount === 1 ? "card" : "cards"}`

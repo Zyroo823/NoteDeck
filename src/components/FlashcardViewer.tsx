@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Maximize2, Minimize2, RotateCcw, Shuffle } from "lucide-react";
 import { shuffleCards, type StudyCardItem } from "@/src/lib/studyLogic";
 
@@ -12,6 +12,7 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
   const [flipped, setFlipped] = useState(false);
   const [shuffled, setShuffled] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const flipButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setDeck(cards);
@@ -36,9 +37,14 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+      if (event.key === "Escape" && fullscreen) {
+        setFullscreen(false);
+        return;
+      }
       const target = event.target as HTMLElement | null;
-      const tag = target?.tagName.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") {
+      if (document.querySelector("dialog[open]") ||
+          (target !== flipButton.current && target?.closest("input, textarea, select, button, a, summary, [contenteditable=true]"))) {
         return;
       }
       if (event.code === "Space") {
@@ -50,8 +56,6 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         goNext();
-      } else if (event.key === "Escape" && fullscreen) {
-        setFullscreen(false);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -78,7 +82,7 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
   if (deck.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-[#141926]">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Add at least one card below to practice in Flashcard mode.
         </p>
       </div>
@@ -91,12 +95,13 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
     <div
       className={
         fullscreen
-          ? "fixed inset-0 z-50 flex flex-col justify-between bg-slate-50 p-6 dark:bg-[#0B0E17] sm:p-10"
+          ? "fixed inset-0 z-50 flex flex-col justify-between gap-4 overflow-y-auto bg-slate-50 p-4 sm:p-10 dark:bg-[#0B0E17]"
           : "space-y-4"
       }
     >
-      <div className="perspective-1000 mx-auto w-full max-w-3xl flex-1 flex flex-col justify-center">
+      <div className="perspective-1000 mx-auto flex w-full flex-1 flex-col justify-center">
         <button
+          ref={flipButton}
           type="button"
           onClick={toggleFlip}
           aria-label={
@@ -104,48 +109,50 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
               ? `Definition: ${currentCard.definition}. Click or press Space to flip to term.`
               : `Term: ${currentCard.term}. Click or press Space to flip to definition.`
           }
-          className={`group relative w-full cursor-pointer rounded-3xl border border-slate-200 bg-white text-center shadow-sm transition-transform duration-300 preserve-3d focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#1E2538] ${
-            fullscreen ? "min-h-[60vh]" : "min-h-[340px]"
+          className={`relative grid w-full cursor-pointer rounded-3xl border border-slate-200 bg-white text-center shadow-sm transition-transform duration-300 motion-reduce:transition-none preserve-3d focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#1E2538] ${
+            fullscreen ? "min-h-[60dvh]" : "min-h-[260px] sm:min-h-[340px]"
           } ${flipped ? "rotate-y-180" : ""}`}
         >
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 backface-hidden">
-            <span className="absolute left-6 top-5 text-xs font-medium text-slate-500">
+          <div aria-hidden={flipped} className={`flex min-w-0 flex-col items-center justify-center px-4 py-12 backface-hidden sm:px-8 ${flipped ? "absolute inset-0 overflow-hidden" : "relative"}`}>
+            <span className="absolute left-4 top-4 text-xs font-medium text-slate-600 sm:left-6 dark:text-slate-400">
               Term
             </span>
-            <span className="absolute right-6 top-5 text-xs text-slate-500">
-              Click or Space to flip
+            <span className="absolute right-4 top-4 text-xs text-slate-600 sm:right-6 dark:text-slate-400">
+              <span className="sm:hidden">Tap to flip</span>
+              <span className="hidden sm:inline">Click or Space to flip</span>
             </span>
-            <p className="max-w-xl text-2xl font-bold leading-snug text-slate-900 dark:text-white sm:text-3xl">
+            <p className="max-w-xl wrap-anywhere text-2xl font-bold leading-snug text-slate-900 dark:text-white sm:text-3xl">
               {currentCard.term}
             </p>
           </div>
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
-            <span className="absolute left-6 top-5 text-xs font-medium text-[#2DD4BF]">
+          <div aria-hidden={!flipped} className={`flex min-w-0 flex-col items-center justify-center px-4 py-12 backface-hidden rotate-y-180 sm:px-8 ${flipped ? "relative" : "absolute inset-0 overflow-hidden"}`}>
+            <span className="absolute left-4 top-4 text-xs font-medium text-teal-700 sm:left-6 dark:text-teal-300">
               Definition
             </span>
-            <span className="absolute right-6 top-5 text-xs text-slate-500">
-              Click or Space to flip
+            <span className="absolute right-4 top-4 text-xs text-slate-600 sm:right-6 dark:text-slate-400">
+              <span className="sm:hidden">Tap to flip</span>
+              <span className="hidden sm:inline">Click or Space to flip</span>
             </span>
-            <p className="max-w-xl text-lg leading-relaxed text-slate-700 dark:text-slate-100 sm:text-xl">
+            <p className="max-w-xl wrap-anywhere text-lg leading-relaxed text-slate-700 dark:text-slate-100 sm:text-xl">
               {currentCard.definition}
             </p>
           </div>
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4">
+      <div className="mx-auto flex w-full items-center justify-between gap-1 sm:gap-4">
         <button
           type="button"
           onClick={handleReset}
           aria-label="Restart deck from first card"
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 whitespace-nowrap transition hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-sm font-medium whitespace-nowrap text-slate-700 transition hover:bg-slate-100 sm:px-3.5 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
         >
           <RotateCcw className="h-4 w-4" />
           <span className="hidden sm:inline">Restart</span>
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <button
             type="button"
             onClick={goPrev}
@@ -158,7 +165,7 @@ export function FlashcardViewer({ cards }: FlashcardViewerProps) {
 
           <span
             data-testid="flashcard-progress"
-            className="min-w-[4.5rem] text-center font-mono-nums text-sm font-semibold text-slate-700 dark:text-slate-200"
+            className="min-w-12 whitespace-nowrap text-center font-mono-nums text-xs font-semibold text-slate-700 sm:min-w-18 sm:text-sm dark:text-slate-200"
           >
             {index + 1} / {deck.length}
           </span>

@@ -152,7 +152,7 @@ export function AuthScreen({
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               {mode === "login" ? "Log in to NoteDeck" : "Create your NoteDeck account"}
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Flashcards, study guides, and active recall quizzes
             </p>
           </div>
@@ -183,7 +183,7 @@ export function AuthScreen({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
               />
             </div>
           ) : null}
@@ -202,7 +202,7 @@ export function AuthScreen({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
-              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
             />
           </div>
 
@@ -220,7 +220,7 @@ export function AuthScreen({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={mode === "login" ? "Enter your password" : "At least 8 characters"}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
             />
           </div>
 
@@ -251,7 +251,7 @@ export function AuthScreen({
 
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-          <span className="text-xs font-medium text-slate-500">or</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">or</span>
           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
         </div>
 
@@ -281,7 +281,7 @@ export function AuthScreen({
       <a href="/" className="mt-5 rounded-md text-sm font-medium text-slate-600 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#5B6CFA] dark:text-slate-300">
         ← Back to NoteDeck
       </a>
-      <nav aria-label="Legal information" className="mt-4 flex gap-5 text-xs text-slate-500 dark:text-slate-400">
+      <nav aria-label="Legal information" className="mt-4 flex gap-5 text-xs text-slate-600 dark:text-slate-400">
         <a href="/privacy" className="hover:underline">Privacy Policy</a>
         <a href="/terms" className="hover:underline">Terms of Service</a>
         <a href="/cookies" className="hover:underline">Cookie Policy</a>

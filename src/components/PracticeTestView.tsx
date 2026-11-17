@@ -38,7 +38,7 @@ export function PracticeTestView({ onNavigate }: { onNavigate: (path: string) =>
         {error ? (
           <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>
         ) : decks === null ? (
-          <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading flashcard sets…</p>
+          <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Loading flashcard sets…</p>
         ) : decks.length === 0 ? (
           <>
             <p className="text-sm text-slate-600 dark:text-slate-300">Add a flashcard set before starting a test.</p>

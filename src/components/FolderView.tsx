@@ -186,7 +186,7 @@ export function FolderView({ folder, onNavigate, onSaved, onDeleted }: FolderVie
           {loadError ? (
             <p role="alert" className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
           ) : items === null ? (
-            <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading study items…</p>
+            <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Loading study items…</p>
           ) : (
             <>
               {contents.length ? (
@@ -232,7 +232,7 @@ export function FolderView({ folder, onNavigate, onSaved, onDeleted }: FolderVie
                   </div>
                 </form>
               ) : (
-                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No unfiled study items to add.</p>
+                <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">No unfiled study items to add.</p>
               )}
             </>
           )}

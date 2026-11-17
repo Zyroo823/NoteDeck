@@ -190,7 +190,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               <FileText className="h-4 w-4" />
             </span>
             <h2 id="generate-modal-title" className="text-lg font-bold text-slate-900 dark:text-white">
-              Generate Study Guides
+              Generate with AI
             </h2>
           </div>
 
@@ -198,7 +198,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
             type="button"
             onClick={onClose}
             disabled={generating || saving}
-            aria-label="Close Generate Study Guides dialog"
+            aria-label="Close generation dialog"
             className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-[#1C2336]"
           >
             <X className="h-5 w-5" />
@@ -221,7 +221,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               <p className="mt-4 text-base font-semibold text-slate-900 dark:text-white">
                 {stepMessage || "Generating study materials..."}
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 Building flashcards and study guide strictly from your source material.
               </p>
             </div>
@@ -230,7 +230,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-bold">Preview and edit before saving</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     Adjust the title, flashcards, or study guide summary before saving to your library.
                   </p>
                 </div>
@@ -379,7 +379,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                   className={`border-b-2 pb-3 text-sm font-medium whitespace-nowrap transition ${
                     tab === "gdrive"
                       ? "border-[#5B6CFA] text-slate-900 dark:text-white"
-                      : "border-transparent text-slate-500"
+                      : "border-transparent text-slate-600 dark:text-slate-400"
                   }`}
                 >
                   Google Drive <span className="ml-1 text-xs">(Coming soon)</span>
@@ -393,7 +393,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                   className={`border-b-2 pb-3 text-sm font-medium whitespace-nowrap transition ${
                     tab === "record"
                       ? "border-[#5B6CFA] text-slate-900 dark:text-white"
-                      : "border-transparent text-slate-500"
+                      : "border-transparent text-slate-600 dark:text-slate-400"
                   }`}
                 >
                   Record lecture <span className="ml-1 text-xs">(Coming soon)</span>
@@ -411,9 +411,9 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
                     placeholder="Paste your lecture notes, reading excerpt, or outline here (at least 30 characters)..."
-                    className="w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-500"
+                    className="w-full rounded-2xl border border-slate-300 bg-white p-4 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#141926] dark:text-slate-100"
                   />
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                     <span>Minimum 30 characters</span>
                     <span className="font-mono-nums">{pastedText.length} / 50,000</span>
                   </div>
@@ -437,7 +437,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                     <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">
                       Drag and drop notes, readings, lecture slides, etc.
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                       Upload up to 2 PDFs or PowerPoint files, each up to 25 MB and 80 pages or slides.
                     </p>
 
@@ -467,7 +467,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                         >
                           <span className="truncate font-medium">{file.name}</span>
                           <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono-nums text-xs text-slate-500">
+                            <span className="font-mono-nums text-xs text-slate-600 dark:text-slate-400">
                               {(file.size / 1024).toFixed(0)} KB
                             </span>
                             <button
@@ -489,7 +489,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">
                     {tab === "gdrive" ? "Google Drive import" : "Lecture audio recording"} is not available yet.
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                     Switch to Paste text or Upload files to generate flashcards and a study guide now.
                   </p>
                 </div>
@@ -504,7 +504,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                     </span>
                     <div>
                       <p className="text-sm font-semibold">Flashcards</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         Memorize key terms &amp; definitions
                       </p>
                     </div>
@@ -516,7 +516,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                     </span>
                     <div>
                       <p className="text-sm font-semibold">Study guide</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         Summary, concepts &amp; key terms
                       </p>
                     </div>
@@ -528,7 +528,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             AI may provide incorrect content. Do not enter personal data.
           </p>
 
@@ -548,7 +548,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               disabled={!canGenerate}
               className="rounded-full bg-[#494bd2] px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {generating ? "Generating..." : "Generate"}
+              {generating ? "Generating…" : "Generate with AI"}
             </button>
           )}
         </div>

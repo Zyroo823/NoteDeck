@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
 
 interface ConfirmDialogProps {
@@ -20,33 +20,36 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !loading) {
-        onCancel();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, loading, onCancel]);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const id = useId();
 
-  if (!open) return null;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (open && dialog && !dialog.open) {
+      dialog.showModal();
+      cancelRef.current?.focus();
+    }
+    if (!open && dialog?.open) dialog.close();
+  }, [open]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl backdrop:bg-black/60 sm:p-6 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100"
+      aria-labelledby={`${id}-title`}
+      aria-describedby={`${id}-message`}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!loading) onCancel();
+      }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#141926]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400">
               <AlertTriangle className="h-5 w-5" />
             </div>
-            <h2 id="confirm-dialog-title" className="text-lg font-bold text-slate-900 dark:text-white">
+            <h2 id={`${id}-title`} className="text-lg font-bold text-slate-900 dark:text-white">
               {title}
             </h2>
           </div>
@@ -62,10 +65,11 @@ export function ConfirmDialog({
           </button>
         </div>
 
-        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{message}</p>
+        <p id={`${id}-message`} className="mt-3 wrap-anywhere text-sm leading-relaxed text-slate-600 dark:text-slate-300">{message}</p>
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button
+            ref={cancelRef}
             type="button"
             onClick={onCancel}
             disabled={loading}
@@ -82,7 +86,6 @@ export function ConfirmDialog({
             {loading ? "Deleting..." : confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+    </dialog>
   );
 }

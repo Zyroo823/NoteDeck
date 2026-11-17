@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Check, ClipboardCheck, FileText, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Check, ClipboardCheck, Ellipsis, FileText, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cardInputSchema } from "@/src/lib/schemas";
 import { FlashcardViewer } from "@/src/components/FlashcardViewer";
 import { StudyChat } from "@/src/components/StudyChat";
@@ -14,6 +14,12 @@ interface StudySetViewProps {
   onNavigate: (path: string) => void;
 }
 
+const studyModes = [
+  { id: "flashcards", label: "Flashcards", icon: Layers },
+  { id: "test", label: "Test", icon: ClipboardCheck },
+  { id: "chat", label: "Ask AI" },
+] as const;
+
 export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewProps) {
   const [detail, setDetail] = useState<StudySetDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +27,8 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
   const [mode, setMode] = useState<"flashcards" | "test" | "chat">(initialMode);
   const [showDefinitions, setShowDefinitions] = useState(false);
   const [revealedCardIds, setRevealedCardIds] = useState<Set<string>>(() => new Set());
+  const actionsRef = useRef<HTMLDetailsElement>(null);
+  const actionsTrigger = useRef<HTMLElement>(null);
 
   // Inline card editing state
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -42,6 +50,30 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode, setId]);
+
+  useEffect(() => {
+    function closeOutside(event: PointerEvent) {
+      const actions = actionsRef.current;
+      if (actions?.open && event.target instanceof Node && !actions.contains(event.target)) actions.open = false;
+    }
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, []);
+
+  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowLeft": nextIndex = (index + studyModes.length - 1) % studyModes.length; break;
+      case "ArrowRight": nextIndex = (index + 1) % studyModes.length; break;
+      case "Home": nextIndex = 0; break;
+      case "End": nextIndex = studyModes.length - 1; break;
+      default: return;
+    }
+    event.preventDefault();
+    const nextMode = studyModes[nextIndex].id;
+    setMode(nextMode);
+    document.getElementById(`study-tab-${nextMode}`)?.focus();
+  }
 
   const loadSet = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -199,8 +231,8 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="h-12 w-72 animate-pulse rounded-xl bg-slate-200 dark:bg-[#141926]" />
+      <div className="space-y-6">
+        <div className="h-12 w-72 max-w-full animate-pulse rounded-xl bg-slate-200 dark:bg-[#141926]" />
         <div className="h-80 animate-pulse rounded-3xl bg-slate-200 dark:bg-[#141926]" />
       </div>
     );
@@ -208,7 +240,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
 
   if (errorMessage || !detail) {
     return (
-      <div className="mx-auto max-w-2xl rounded-2xl border border-red-300 bg-red-50 p-6 text-center dark:border-red-900/60 dark:bg-red-950/40">
+      <div className="rounded-2xl border border-red-300 bg-red-50 p-6 text-center dark:border-red-900/60 dark:bg-red-950/40">
         <p className="text-sm font-medium text-red-700 dark:text-red-300">
           {errorMessage || "Study set not found."}
         </p>
@@ -224,20 +256,20 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+    <div className="space-y-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
+        <div className="min-w-0 sm:flex-1">
+          <h1 className="wrap-anywhere text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             {detail.set.title}
           </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <span>Created by {detail.creatorName}</span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <span className="wrap-anywhere">Created by {detail.creatorName}</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono-nums">{detail.cards.length} terms</span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
           {detail.linkedGuideId ? (
             <button
               type="button"
@@ -258,86 +290,78 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
             Edit
           </button>
 
-          <button
-            type="button"
-            onClick={() => setDeleteSetOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-300 px-3.5 text-sm font-medium text-red-600 whitespace-nowrap transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/40"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
+          <details ref={actionsRef}
+            className="relative"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && event.currentTarget.open) {
+                event.preventDefault();
+                actionsTrigger.current?.focus();
+                event.currentTarget.open = false;
+              }
+            }}>
+            <summary ref={actionsTrigger} aria-label="More set actions"
+              className="grid size-10 cursor-pointer list-none place-items-center rounded-xl border border-slate-300 bg-white hover:bg-slate-100 dark:border-slate-700 dark:bg-[#141926] dark:hover:bg-[#1C2336] [&::-webkit-details-marker]:hidden">
+              <Ellipsis aria-hidden="true" className="size-5" />
+            </summary>
+            <div className="absolute right-0 z-10 mt-2 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-[#141926]">
+              <button type="button" onClick={() => {
+                actionsTrigger.current?.focus();
+                if (actionsRef.current) actionsRef.current.open = false;
+                setDeleteSetOpen(true);
+              }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">
+                <Trash2 aria-hidden="true" className="size-4" />
+                Delete set
+              </button>
+            </div>
+          </details>
         </div>
       </div>
 
       <div
         role="tablist"
         aria-label="Study mode"
-        className="grid grid-cols-3 gap-3"
+        className="grid grid-cols-3 gap-2 sm:gap-3"
       >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "flashcards"}
-          onClick={() => setMode("flashcards")}
-          className={`flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-semibold whitespace-nowrap transition ${
-            mode === "flashcards"
-              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#494bd2] dark:text-[#a5b4fc]"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
-          }`}
-        >
-          <Layers className="h-4 w-4" />
-          Flashcards
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "test"}
-          onClick={() => setMode("test")}
-          className={`flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-semibold whitespace-nowrap transition ${
-            mode === "test"
-              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#494bd2] dark:text-[#a5b4fc]"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
-          }`}
-        >
-          <ClipboardCheck className="h-4 w-4" />
-          Test
-        </button>
-
-        <button
-          id="ask-ai-tab"
-          type="button"
-          role="tab"
-          aria-selected={mode === "chat"}
-          aria-controls={mode === "chat" ? "ask-ai-panel" : undefined}
-          onClick={() => setMode("chat")}
-          className={`flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-semibold whitespace-nowrap transition ${
-            mode === "chat"
-              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#494bd2] dark:text-[#a5b4fc]"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
-          }`}
-        >
-          Ask AI
-        </button>
+        {studyModes.map((tab, index) => {
+          const Icon = "icon" in tab ? tab.icon : undefined;
+          return (
+            <button key={tab.id} id={`study-tab-${tab.id}`} type="button" role="tab"
+              aria-selected={mode === tab.id} aria-controls={`study-panel-${tab.id}`}
+              tabIndex={mode === tab.id ? 0 : -1}
+              onClick={() => setMode(tab.id)} onKeyDown={(event) => handleTabKey(event, index)}
+              className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition ${
+                mode === tab.id
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-800 dark:border-indigo-400 dark:bg-indigo-500/15 dark:text-indigo-200"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
+              }`}>
+              {Icon && <Icon aria-hidden="true" className="hidden size-4 sm:block" />}
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {mode === "flashcards" ? (
-        <FlashcardViewer cards={detail.cards} />
-      ) : mode === "test" ? (
+      <div id="study-panel-flashcards" role="tabpanel" aria-labelledby="study-tab-flashcards" hidden={mode !== "flashcards"}>
+        {mode === "flashcards" && <FlashcardViewer cards={detail.cards} />}
+      </div>
+      <div id="study-panel-test" role="tabpanel" aria-labelledby="study-tab-test" hidden={mode !== "test"}>
         <TestMode
+          key={setId}
           setId={setId}
           cards={detail.cards}
           onAttemptSaved={() => {
             void loadSet(true);
           }}
         />
-      ) : (
-        <div id="ask-ai-panel" role="tabpanel" aria-labelledby="ask-ai-tab">
-          <StudyChat key={setId} setId={setId} title={detail.set.title} />
-        </div>
-      )}
+      </div>
+      <div id="study-panel-chat" role="tabpanel" aria-labelledby="study-tab-chat" hidden={mode !== "chat"}>
+        {mode === "chat" && <StudyChat key={setId} setId={setId} title={detail.set.title} />}
+      </div>
 
-      <section hidden={mode === "chat"} aria-labelledby="terms-list-heading" className="space-y-4 pt-4">
+      <section hidden={mode !== "flashcards"} aria-labelledby="terms-list-heading" className="space-y-4 pt-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="terms-list-heading" className="text-lg font-bold">
             Terms in this set (<span className="font-mono-nums">{detail.cards.length}</span>)
@@ -386,7 +410,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="new-inline-term" className="mb-1 block text-xs font-medium text-slate-500">
+                <label htmlFor="new-inline-term" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
                   Term
                 </label>
                 <input
@@ -399,7 +423,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                 />
               </div>
               <div>
-                <label htmlFor="new-inline-def" className="mb-1 block text-xs font-medium text-slate-500">
+                <label htmlFor="new-inline-def" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
                   Definition
                 </label>
                 <input
@@ -446,7 +470,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                       <div>
                         <label
                           htmlFor={`edit-term-${card.id}`}
-                          className="mb-1 block text-xs font-medium text-slate-500"
+                          className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400"
                         >
                           Term
                         </label>
@@ -461,7 +485,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                       <div>
                         <label
                           htmlFor={`edit-def-${card.id}`}
-                          className="mb-1 block text-xs font-medium text-slate-500"
+                          className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400"
                         >
                           Definition
                         </label>
@@ -528,7 +552,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                         type="button"
                         onClick={() => startEditCard(card)}
                         aria-label={`Edit card "${card.term}"`}
-                        className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-[#1C2336] dark:hover:text-white"
+                        className="rounded-lg p-2 text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-[#1C2336] dark:hover:text-white"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -536,7 +560,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                         type="button"
                         onClick={() => setDeleteCardTarget(card)}
                         aria-label={`Delete card "${card.term}"`}
-                        className="rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                        className="rounded-lg p-2 text-slate-600 dark:text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

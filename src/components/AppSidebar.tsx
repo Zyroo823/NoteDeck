@@ -1,21 +1,22 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { FileText, Folder, Home, Layers, Library, PanelLeftOpen, X } from "lucide-react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
+import { FileText, Folder, Home, Layers, Library, X } from "lucide-react";
 import type { FolderSummary } from "@/src/types/api";
 
 interface AppSidebarProps {
   folders?: FolderSummary[];
   foldersFailed?: boolean;
   currentPath: string;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
   onNavigate: (path: string) => void;
 }
 
 const sidebarSurface = "border-slate-200 bg-white dark:border-slate-800 dark:bg-[#131826]";
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500";
 const navItem = "relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium";
-const sectionLabel = "mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400";
+const sectionLabel = "mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400";
 
-export function AppSidebar({ folders, foldersFailed, currentPath, onNavigate }: AppSidebarProps) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, onMobileClose, onNavigate }: AppSidebarProps) {
   const drawer = useRef<HTMLDialogElement>(null);
   const { pathname, searchParams } = new URL(currentPath, window.location.origin);
   const libraryType = searchParams.get("type");
@@ -26,6 +27,12 @@ export function AppSidebar({ folders, foldersFailed, currentPath, onNavigate }: 
   useEffect(() => {
     drawer.current?.close();
   }, [currentPath]);
+
+  useEffect(() => {
+    const dialog = drawer.current;
+    if (mobileOpen && !dialog?.open) dialog?.showModal();
+    if (!mobileOpen && dialog?.open) dialog.close();
+  }, [mobileOpen]);
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");
@@ -85,7 +92,7 @@ export function AppSidebar({ folders, foldersFailed, currentPath, onNavigate }: 
             ))}
           </ul>
         ) : (
-          <p className="px-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="px-3 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
             {foldersFailed ? "Could not load folders." : folders ? "No folders yet." : "Loading folders…"}
           </p>
         )}
@@ -95,30 +102,18 @@ export function AppSidebar({ folders, foldersFailed, currentPath, onNavigate }: 
 
   return (
     <>
-      <aside className={`sticky top-16 hidden h-[calc(100dvh-4rem)] w-60 shrink-0 self-start overflow-y-auto border-r p-3 md:flex md:flex-col ${sidebarSurface}`}>
+      <aside className={`sticky top-16 hidden max-h-[calc(100dvh-4rem)] w-60 shrink-0 overflow-y-auto border-r p-3 md:flex md:flex-col ${sidebarSurface}`}>
         {navigation}
       </aside>
-      <div className={`fixed inset-x-0 bottom-0 z-20 flex justify-center border-t px-3 pb-[env(safe-area-inset-bottom)] md:hidden ${sidebarSurface}`}>
-        <button type="button" aria-controls="mobile-sidebar" aria-expanded={drawerOpen} aria-haspopup="dialog"
-          className={`flex min-h-12 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-indigo-700 dark:text-indigo-300 ${focusRing}`}
-          onClick={() => {
-            const dialog = drawer.current;
-            if (!dialog || dialog.open) return;
-            dialog.showModal();
-            setDrawerOpen(true);
-          }}>
-          <PanelLeftOpen aria-hidden="true" className="size-4" /> Browse
-        </button>
-      </div>
       <dialog id="mobile-sidebar" ref={drawer} aria-labelledby="mobile-sidebar-title"
-        onClose={() => setDrawerOpen(false)}
+        onClose={onMobileClose}
         onClick={(event) => {
           if (event.target === event.currentTarget) drawer.current?.close();
         }}
-        className={`fixed top-16 left-0 m-0 h-[calc(100dvh-4rem)] max-h-none w-60 max-w-[90vw] -translate-x-full overflow-y-auto border-r text-inherit transition-[translate,display,overlay] duration-200 [transition-behavior:allow-discrete] open:translate-x-0 starting:open:-translate-x-full backdrop:bg-black/50 motion-reduce:transition-none md:hidden ${sidebarSurface}`}>
+        className={`fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-64 max-w-[90vw] -translate-x-full overflow-y-auto border-r text-inherit transition-[translate,display,overlay] duration-200 [transition-behavior:allow-discrete] open:translate-x-0 starting:open:-translate-x-full backdrop:bg-black/50 motion-reduce:transition-none md:hidden ${sidebarSurface}`}>
         <div className="flex min-h-full flex-col px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mb-3 flex items-center justify-between pl-3">
-            <h2 id="mobile-sidebar-title" className="text-sm font-semibold">Browse</h2>
+            <h2 id="mobile-sidebar-title" className="text-sm font-semibold">Navigation</h2>
             <button type="button" autoFocus aria-label="Close navigation"
               className={`grid size-10 place-items-center rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 ${focusRing}`}
               onClick={() => drawer.current?.close()}><X aria-hidden="true" className="size-4" /></button>

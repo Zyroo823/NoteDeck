@@ -170,7 +170,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Example: Biology Chapter 4 Cell Transport"
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
         />
       </div>
 
@@ -181,7 +181,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
             className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-[#141926]"
           >
             <div className="mb-3 flex items-center justify-between">
-              <span className="font-mono-nums text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="font-mono-nums text-xs font-semibold text-slate-600 dark:text-slate-400">
                 Card {index + 1}
               </span>
               <button
@@ -199,7 +199,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
               <div>
                 <label
                   htmlFor={`card-term-${index}`}
-                  className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400"
                 >
                   Term
                 </label>
@@ -209,14 +209,14 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
                   value={card.term}
                   onChange={(e) => updateRow(index, "term", e.target.value)}
                   placeholder="Enter term"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor={`card-def-${index}`}
-                  className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400"
+                  className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400"
                 >
                   Definition
                 </label>
@@ -226,7 +226,7 @@ export function SetFormView({ mode, setId, onNavigate }: SetFormViewProps) {
                   value={card.definition}
                   onChange={(e) => updateRow(index, "definition", e.target.value)}
                   placeholder="Enter definition"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#0B0E17] dark:text-slate-100"
                 />
               </div>
             </div>

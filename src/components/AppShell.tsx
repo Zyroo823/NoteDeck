@@ -6,6 +6,7 @@ import {
   Layers,
   LogOut,
   Moon,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -46,6 +47,7 @@ export function AppShell({
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [createOpen, setCreateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [navigationOpen, setNavigationOpen] = useState(false);
 
   const createRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLDivElement | null>(null);
@@ -92,16 +94,31 @@ export function AppShell({
   const initialLetter = user.name.trim().slice(0, 1).toUpperCase() || "S";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0E17] dark:text-slate-100">
+    <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-[#0B0E17] dark:text-slate-100">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-slate-900 focus:shadow-lg">
         Skip to content
       </a>
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-[#0B0E17]/95">
+      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:gap-4 sm:px-4 dark:border-slate-800 dark:bg-[#0B0E17]/95">
+        <button
+          type="button"
+          aria-label="Open navigation"
+          aria-controls="mobile-sidebar"
+          aria-expanded={navigationOpen}
+          aria-haspopup="dialog"
+          onClick={() => {
+            setNavigationOpen(true);
+            setCreateOpen(false);
+            setProfileOpen(false);
+          }}
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-slate-700 hover:bg-slate-100 md:hidden dark:text-slate-200 dark:hover:bg-[#1C2336]"
+        >
+          <PanelLeftOpen aria-hidden="true" className="size-5" />
+        </button>
         <button
           type="button"
           onClick={() => onNavigate("/")}
           aria-label="Go to NoteDeck Home"
-          className="flex items-center gap-2.5 rounded-xl py-1.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
+          className="hidden items-center gap-2.5 rounded-xl py-1.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] sm:flex"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#494bd2] text-white">
             <BookOpen className="h-4 w-4" />
@@ -121,7 +138,7 @@ export function AppShell({
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search your library"
-              className="h-10 w-full rounded-full border border-slate-200 bg-slate-100 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-400"
+              className="h-10 w-full rounded-full border border-slate-200 bg-slate-100 pl-9 pr-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] max-[360px]:placeholder:text-xs sm:pl-10 sm:pr-4 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100"
             />
           </div>
         </form>
@@ -170,7 +187,7 @@ export function AppShell({
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]"
                 >
                   <Sparkles className="h-4 w-4 text-[#2DD4BF]" />
-                  Generate study materials
+                  Generate with AI
                 </button>
 
                 <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
@@ -216,15 +233,15 @@ export function AppShell({
               >
                 <div className="border-b border-slate-200 px-3 py-2.5 dark:border-slate-800">
                   <p className="truncate text-sm font-semibold">{user.name}</p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                  <p className="truncate text-xs text-slate-600 dark:text-slate-400">{user.email}</p>
                 </div>
 
                 <div className="py-1">
                   {user.role === "admin" && (
                     <button type="button" role="menuitem" onClick={() => { setProfileOpen(false); onNavigate("/admin"); }}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-[#1C2336]">
-                      <ShieldCheck className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                      Manage users
+                      <ShieldCheck className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                      Manage Users
                     </button>
                   )}
                   <button
@@ -236,7 +253,7 @@ export function AppShell({
                     }}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-[#1C2336]"
                   >
-                    <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                    <Settings className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                     Settings
                   </button>
 
@@ -275,12 +292,15 @@ export function AppShell({
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100dvh-4rem)]">
-        <AppSidebar key={user.id} folders={folders} foldersFailed={foldersFailed} currentPath={currentPath} onNavigate={onNavigate} />
+      <div className="flex flex-1">
+        <AppSidebar key={user.id} folders={folders} foldersFailed={foldersFailed} currentPath={currentPath}
+          mobileOpen={navigationOpen} onMobileClose={() => setNavigationOpen(false)} onNavigate={onNavigate} />
 
-        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] focus-visible:outline-none sm:px-6 md:pb-6 lg:px-10">{children}</main>
+        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 focus-visible:outline-none sm:px-6 lg:px-10">
+          <div className="mx-auto w-full max-w-5xl">{children}</div>
+        </main>
       </div>
-      <footer className="flex flex-wrap justify-center gap-5 border-t border-slate-200 px-4 py-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 border-t border-slate-200 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-xs text-slate-600 dark:border-slate-800 dark:text-slate-400">
         <a href="/privacy" className="hover:underline focus-visible:underline">Privacy Policy</a>
         <a href="/terms" className="hover:underline focus-visible:underline">Terms of Service</a>
         <a href="/cookies" className="hover:underline focus-visible:underline">Cookie Policy</a>

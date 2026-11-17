@@ -26,20 +26,20 @@ type SortKey = (typeof sortColumns)[number]["key"];
 const monoLabel = "font-mono-nums text-xs font-medium tracking-wider text-slate-600 dark:text-slate-400";
 const line = "border-slate-200 dark:border-slate-800";
 const surface = "bg-white dark:bg-[#141926]";
-const panel = `rounded-2xl border p-6 ${line} ${surface}`;
+const panel = `rounded-2xl border p-4 sm:p-6 ${line} ${surface}`;
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#494bd2] dark:focus-visible:outline-[#a5b4fc]";
 const disabledStyle = "disabled:cursor-not-allowed disabled:opacity-50";
 const control = `h-10 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-[#0B0E17] ${focusRing} ${disabledStyle}`;
 const button = `inline-flex h-10 shrink-0 items-center justify-center rounded-xl text-sm font-medium transition ${focusRing} ${disabledStyle}`;
 const secondary = "border border-slate-300 bg-white enabled:hover:bg-slate-100 dark:border-slate-700 dark:bg-[#141926] dark:enabled:hover:bg-[#1C2336]";
-const destructive = "border border-red-300 text-red-600 enabled:hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:enabled:hover:bg-red-950/40";
+const destructive = "border border-red-300 text-red-700 enabled:hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:enabled:hover:bg-red-950/40";
 const primary = "bg-[#494bd2] text-white enabled:hover:bg-[#4B5CE8]";
 
 function confirmationText(user: ManagedUser, update: AccessUpdate) {
   if ("role" in update) {
     const effect = update.role === "admin"
       ? "They will be able to manage user roles and account access."
-      : "They will lose access to Manage users.";
+      : "They will lose access to Manage Users.";
     return { title: `Change ${user.email} from ${user.role} to ${update.role}?`, message: effect, label: "Change role" };
   }
   return update.suspended
@@ -157,7 +157,7 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
     });
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 text-slate-900 dark:text-slate-100">
+    <div className="space-y-5 text-slate-900 dark:text-slate-100">
       <header className={`border-b pb-3 ${line}`}>
         <p className="text-xs font-medium tracking-wide text-slate-600 dark:text-slate-400">Admin</p>
         <h1 id="manage-users-heading" className="mt-1 text-2xl font-bold tracking-tight">
@@ -165,7 +165,7 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
         </h1>
       </header>
 
-      <div className={`grid gap-4 min-[700px]:grid-cols-[2fr_1fr] ${panel}`}>
+      <div className={`grid gap-4 lg:grid-cols-[2fr_1fr] ${panel}`}>
         <label className="grid min-w-0 gap-1.5">
           <span className="text-sm font-medium">Search Users</span>
           <span className="relative block">
@@ -193,11 +193,11 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
       ) : visibleUsers.length > 0 ? (
         <div className={panel}>
           <div role="group" aria-label="Sort users"
-            className={`flex gap-4 pb-3 min-[700px]:hidden ${monoLabel}`}>
+            className={`flex gap-4 pb-3 lg:hidden ${monoLabel}`}>
             {sortColumns.map(({ key, label }) => <span key={key}>{sortButton(key, label)}</span>)}
           </div>
-          <table role="table" aria-labelledby="manage-users-heading" className="w-full table-fixed text-left text-sm max-[699px]:block">
-            <thead className={`border-b max-[699px]:hidden ${line} ${monoLabel}`}>
+          <table role="table" aria-labelledby="manage-users-heading" className="w-full table-fixed text-left text-sm max-lg:block">
+            <thead className={`border-b max-lg:hidden ${line} ${monoLabel}`}>
               <tr>
                 <th scope="col" aria-sort={sort.key === "name" ? sort.direction : undefined} className="w-[26%] px-2 py-3">{sortButton("name", "Name")}</th>
                 <th scope="col" className="px-2 py-3">Email</th>
@@ -206,7 +206,7 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
                 <th scope="col" className="w-40 px-2 py-3 text-right xl:w-44">Actions</th>
               </tr>
             </thead>
-            <tbody role="rowgroup" className="max-[699px]:block max-[699px]:space-y-3 min-[700px]:divide-y min-[700px]:divide-slate-200 dark:min-[700px]:divide-slate-800">
+            <tbody role="rowgroup" className="max-lg:block max-lg:space-y-3 lg:divide-y lg:divide-slate-200 dark:lg:divide-slate-800">
               {visibleUsers.map((user) => {
                 const isCurrentUser = user.id === currentUserId;
                 const isLastAdmin = activeAdmins.length === 1 && activeAdmins[0].id === user.id;
@@ -217,18 +217,18 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
 
                 return (
                   <tr key={user.id} role="row" aria-busy={busy === user.id}
-                    className={`hover:bg-slate-100 max-[699px]:grid max-[699px]:grid-cols-[minmax(0,1fr)_auto] max-[699px]:items-center max-[699px]:gap-x-3 max-[699px]:gap-y-2 max-[699px]:rounded-xl max-[699px]:border max-[699px]:p-3 min-[700px]:h-14 dark:hover:bg-[#1C2336] ${line} ${
+                    className={`hover:bg-slate-100 max-lg:grid max-lg:grid-cols-[minmax(0,1fr)_auto] max-lg:items-center max-lg:gap-x-3 max-lg:gap-y-2 max-lg:rounded-xl max-lg:border max-lg:p-3 lg:h-14 dark:hover:bg-[#1C2336] ${line} ${
                       user.suspended ? "opacity-85" : ""
                     }`}>
-                    <th scope="row" role="rowheader" className="px-2 py-2 text-left font-medium max-[699px]:col-span-2 max-[699px]:p-0">
+                    <th scope="row" role="rowheader" className="px-2 py-2 text-left font-medium max-lg:col-span-2 max-lg:p-0">
                       <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
                         <span className="truncate" title={user.name}>{user.name}</span>
                         {isCurrentUser && <span className="shrink-0 text-xs font-normal text-slate-600 dark:text-slate-400">(YOU)</span>}
                         {user.suspended && <span className="shrink-0 rounded-md border border-slate-300 px-1.5 text-xs font-normal text-slate-600 dark:border-slate-700 dark:text-slate-400">Deactivated</span>}
                       </div>
                     </th>
-                    <td role="cell" title={user.email} className="px-2 py-2 text-slate-600 max-[699px]:col-span-2 max-[699px]:p-0 max-[699px]:wrap-anywhere min-[700px]:truncate dark:text-slate-400">{user.email}</td>
-                    <td role="cell" className="px-2 py-1.5 max-[699px]:p-0 xl:pl-4">
+                    <td role="cell" title={user.email} className="px-2 py-2 text-slate-600 max-lg:col-span-2 max-lg:p-0 max-lg:wrap-anywhere lg:truncate dark:text-slate-400">{user.email}</td>
+                    <td role="cell" className="px-2 py-1.5 max-lg:p-0 xl:pl-4">
                       <div className="group relative w-full max-w-24" tabIndex={protectedReason ? 0 : undefined}
                         aria-describedby={protectedReason ? roleHelpId : undefined}>
                         <select value={user.role} aria-label={`Role for ${user.email}`} disabled={!!busy || !!protectedReason}
@@ -245,11 +245,11 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
                         {protectedReason && <ProtectionTooltip id={roleHelpId} reason={protectedReason} />}
                       </div>
                     </td>
-                    <td role="cell" className="px-2 py-2 whitespace-nowrap text-slate-600 max-[699px]:p-0 xl:pl-4 dark:text-slate-400">
+                    <td role="cell" className="px-2 py-2 whitespace-nowrap text-slate-600 max-lg:p-0 xl:pl-4 dark:text-slate-400">
                       {Number.isNaN(joined.getTime()) ? "—" : <time dateTime={user.createdAt}>{joinedDate.format(joined)}</time>}
                     </td>
-                    <td role="cell" className="px-2 py-1.5 max-[699px]:col-span-2 max-[699px]:p-0">
-                      <div className="flex items-center gap-2 min-[700px]:justify-end xl:gap-3">
+                    <td role="cell" className="px-2 py-1.5 max-lg:col-span-2 max-lg:p-0">
+                      <div className="flex items-center gap-2 lg:justify-end xl:gap-3">
                         <button type="button" aria-label={`Edit display name for ${user.email}`} disabled={!!busy}
                           onClick={() => startEdit(user)}
                           className={`w-10 ${button} ${secondary}`}>
@@ -325,7 +325,7 @@ export function AdminView({ currentUserId }: { currentUserId: string }) {
 function ProtectionTooltip({ id, reason, alignRight = false }: { id: string; reason: string; alignRight?: boolean }) {
   return (
     <span id={id} role="tooltip"
-      className={`invisible absolute top-full z-10 mt-1 w-max max-w-40 rounded-lg border px-2 py-1 text-left text-xs group-hover:visible group-focus-within:visible ${alignRight ? "left-0 min-[700px]:right-0 min-[700px]:left-auto" : "left-0"} ${surface} ${line}`}>
+      className={`invisible absolute top-full z-10 mt-1 w-max max-w-40 rounded-lg border px-2 py-1 text-left text-xs group-hover:visible group-focus-within:visible ${alignRight ? "left-0 lg:right-0 lg:left-auto" : "left-0"} ${surface} ${line}`}>
       {reason}
     </span>
   );

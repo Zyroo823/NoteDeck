@@ -122,7 +122,7 @@ export function LibraryView({
             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition hover:bg-slate-100 dark:border-slate-700 dark:bg-[#141926] dark:hover:bg-[#1C2336]"
           >
             <Sparkles className="h-4 w-4 text-[#2DD4BF]" />
-            Generate study guide
+            Generate with AI
           </button>
 
           <button
@@ -131,7 +131,7 @@ export function LibraryView({
             className="inline-flex items-center gap-2 rounded-xl bg-[#494bd2] px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap transition hover:bg-[#4B5CE8]"
           >
             <Plus className="h-4 w-4" />
-            New flashcard set
+            Create flashcard set
           </button>
         </div>
       </div>
@@ -191,7 +191,7 @@ export function LibraryView({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter by title..."
-            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100 dark:placeholder:text-slate-500"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100"
           />
         </div>
       </div>
@@ -216,10 +216,10 @@ export function LibraryView({
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-[#141926]">
           <Layers className="mx-auto h-8 w-8 text-slate-500" />
           <h2 className="mt-3 text-lg font-semibold">No matching items found</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {query.trim()
               ? "Try another keyword or clear your search filter."
-              : "Create your first flashcard set or generate a study guide."}
+              : "Create a flashcard set or generate study materials from your notes."}
           </p>
           <div className="mt-5 flex justify-center gap-3">
             <button
@@ -236,10 +236,10 @@ export function LibraryView({
         <div className="space-y-8">
           {visibleSets.length > 0 ? (
             <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400">
                 Flashcard sets (<span className="font-mono-nums">{visibleSets.length}</span>)
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {visibleSets.map((item) => (
                   <article
                     key={item.id}
@@ -250,10 +250,10 @@ export function LibraryView({
                       onClick={() => onNavigate(`/sets/${item.id}`)}
                       className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
                     >
-                      <h3 className="truncate text-base font-bold text-slate-900 dark:text-white">
+                      <h3 className="line-clamp-2 wrap-anywhere text-base font-bold text-slate-900 dark:text-white">
                         {item.title}
                       </h3>
-                      <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                         <Layers className="h-3.5 w-3.5 text-[#5B6CFA]" />
                         <span className="font-mono-nums">{item.cardCount} cards</span>
                         <span aria-hidden="true">·</span>
@@ -289,10 +289,10 @@ export function LibraryView({
 
           {visibleGuides.length > 0 ? (
             <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400">
                 Study guides (<span className="font-mono-nums">{visibleGuides.length}</span>)
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {visibleGuides.map((guide) => (
                   <article
                     key={guide.id}
@@ -303,10 +303,10 @@ export function LibraryView({
                       onClick={() => onNavigate(`/guides/${guide.id}`)}
                       className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2DD4BF]"
                     >
-                      <h3 className="truncate text-base font-bold text-slate-900 dark:text-white">
+                      <h3 className="line-clamp-2 wrap-anywhere text-base font-bold text-slate-900 dark:text-white">
                         {guide.title}
                       </h3>
-                      <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
                         <FileText className="h-3.5 w-3.5 text-[#2DD4BF]" />
                         <span className="font-mono-nums">{guide.conceptCount} concepts</span>
                         <span aria-hidden="true">·</span>

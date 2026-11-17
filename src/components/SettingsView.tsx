@@ -103,7 +103,7 @@ export function SettingsView({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -132,7 +132,7 @@ export function SettingsView({
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="mt-4 max-w-lg space-y-4" noValidate>
           <div>
             <label htmlFor="settings-email" className="mb-1.5 block text-sm font-medium">
               Email
@@ -212,9 +212,9 @@ export function SettingsView({
           {googleConfirmation === "failed" && !deleteError && (
             <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">Google confirmation failed. Choose the Google account linked to NoteDeck and try again.</p>
           )}
-          <form onSubmit={handleDeleteAccount} className="mt-4 space-y-3">
+          <form onSubmit={handleDeleteAccount} className="mt-4 max-w-lg space-y-3">
             <label htmlFor="delete-account-email" className="block text-sm font-medium">
-              Type <span className="font-mono">{user.email}</span> to confirm
+              Type <span className="font-mono wrap-anywhere">{user.email}</span> to confirm
             </label>
             <input
               id="delete-account-email"

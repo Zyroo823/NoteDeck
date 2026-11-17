@@ -279,7 +279,7 @@ export function StudyGuideView({ guideId, onNavigate }: StudyGuideViewProps) {
                 <div>
                   <label
                     htmlFor={`concept-bullets-${cIdx}`}
-                    className="mb-1 block text-xs text-slate-500"
+                    className="mb-1 block text-xs text-slate-600 dark:text-slate-400"
                   >
                     Bullet points (one per line)
                   </label>

@@ -5,10 +5,21 @@
   html {
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
     color-scheme: dark;
+    scroll-padding-top: 5rem;
+    scrollbar-gutter: stable;
   }
 
   html:not(.dark) {
     color-scheme: light;
+  }
+
+  :where(input, textarea)::placeholder {
+    color: var(--color-slate-600);
+    opacity: 1;
+  }
+
+  .dark :where(input, textarea)::placeholder {
+    color: var(--color-slate-400);
   }
 
   .font-mono-nums {
@@ -24,6 +35,32 @@
   .dark :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
     outline-color: #a5b4fc;
   }
+}
+
+.quiz-progress {
+  --quiz-track: var(--color-slate-200);
+  --quiz-fill: #494bd2;
+  appearance: none;
+  background: var(--quiz-track);
+}
+
+.dark .quiz-progress {
+  --quiz-track: var(--color-slate-700);
+  --quiz-fill: var(--color-indigo-400);
+}
+
+.quiz-progress::-webkit-progress-bar {
+  background: var(--quiz-track);
+}
+
+.quiz-progress::-webkit-progress-value {
+  background: var(--quiz-fill);
+  border-radius: 9999px;
+}
+
+.quiz-progress::-moz-progress-bar {
+  background: var(--quiz-fill);
+  border-radius: 9999px;
 }
 
 .perspective-1000 {
