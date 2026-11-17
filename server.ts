@@ -30,6 +30,7 @@ import {
   verifySessionToken,
   writeDb,
   type StudySetRecord,
+  type UserRecord,
 } from "./server/store";
 import { extractFromUploadedFiles } from "./server/extract";
 import { answerStudyQuestion, captureStudySource, generateStudyMaterials } from "./server/ai";
@@ -86,6 +87,11 @@ function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): voi
 
 function publicStudySet({ studySource, chatTurns, ...set }: StudySetRecord) {
   return set;
+}
+
+function isLastActiveAdmin(user: UserRecord, users: UserRecord[]): boolean {
+  return user.role === "admin" && !user.suspended &&
+    !users.some((other) => other.id !== user.id && other.role === "admin" && !other.suspended);
 }
 
 function openChatSet(req: AuthedRequest, res: Response) {
@@ -266,6 +272,10 @@ async function startServer() {
       res.status(400).json({ error: "Enter the email address on your account to confirm deletion." });
       return;
     }
+    if (isLastActiveAdmin(user, db.users)) {
+      res.status(400).json({ error: "Make another account an admin before deleting the last active administrator." });
+      return;
+    }
 
     const setIds = new Set(db.studySets.filter((record) => record.userId === user.id).map((record) => record.id));
     db.users = db.users.filter((record) => record.id !== user.id);
@@ -316,28 +326,39 @@ async function startServer() {
       res.status(404).json({ error: "User not found." });
       return;
     }
-    const { role, suspended } = req.body ?? {};
+    const { role, suspended, name } = req.body ?? {};
     const keys = Object.keys(req.body ?? {});
-    if (keys.length !== 1 || (keys[0] === "role" && role !== "admin" && role !== "user") ||
-        (keys[0] === "suspended" && typeof suspended !== "boolean") ||
-        !["role", "suspended"].includes(keys[0])) {
+    const field = keys[0];
+    if (keys.length !== 1 || !["role", "suspended", "name"].includes(field) ||
+        (field === "role" && role !== "admin" && role !== "user") ||
+        (field === "suspended" && typeof suspended !== "boolean")) {
       res.status(400).json({ error: "Invalid account update." });
       return;
     }
-    if (target.id === actor.id) {
+    if (field !== "name" && target.id === actor.id) {
       res.status(400).json({ error: "You cannot change your own role or access." });
       return;
     }
-    if (target.role === "admin" && (role === "user" || suspended === true) &&
-        db.users.filter((user) => user.role === "admin" && !user.suspended).length <= 1) {
+    if ((role === "user" || suspended === true) && isLastActiveAdmin(target, db.users)) {
       res.status(400).json({ error: "At least one active administrator is required." });
       return;
     }
-    const action = keys[0] === "role" ? `role:${role}` : (suspended ? "suspended" : "restored");
-    if (keys[0] === "role") target.role = role;
-    else {
+    let action: string;
+    if (field === "name") {
+      const parsed = profileUpdateSchema.safeParse({ name: typeof name === "string" ? cleanPlainText(name) : name });
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Enter a valid display name." });
+        return;
+      }
+      target.name = parsed.data.name;
+      action = "name:updated";
+    } else if (field === "role") {
+      target.role = role;
+      action = `role:${role}`;
+    } else {
       if (!target.suspended && suspended) target.sessionVersion = (target.sessionVersion ?? 0) + 1;
       target.suspended = suspended;
+      action = suspended ? "suspended" : "restored";
     }
     (db.adminAudit ??= []).push({ actorId: actor.id, targetId: target.id, action, createdAt: new Date().toISOString() });
     writeDb(db);
