@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Check, ClipboardCheck, FileText, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cardInputSchema } from "@/src/lib/schemas";
 import { FlashcardViewer } from "@/src/components/FlashcardViewer";
+import { StudyChat } from "@/src/components/StudyChat";
 import { TestMode } from "@/src/components/TestMode";
 import { ConfirmDialog } from "@/src/components/ConfirmDialog";
 import type { StudySetDetail } from "@/src/types/api";
@@ -17,7 +18,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
   const [detail, setDetail] = useState<StudySetDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [mode, setMode] = useState<"flashcards" | "test">(initialMode);
+  const [mode, setMode] = useState<"flashcards" | "test" | "chat">(initialMode);
   const [showDefinitions, setShowDefinitions] = useState(false);
   const [revealedCardIds, setRevealedCardIds] = useState<Set<string>>(() => new Set());
 
@@ -40,7 +41,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
 
   useEffect(() => {
     setMode(initialMode);
-  }, [initialMode]);
+  }, [initialMode, setId]);
 
   const loadSet = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -303,18 +304,26 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
           Test
         </button>
 
-        <div
-          aria-disabled="true"
-          className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/60 text-sm font-medium text-slate-500 whitespace-nowrap dark:border-slate-800/80 dark:bg-[#141926]/50"
+        <button
+          id="ask-ai-tab"
+          type="button"
+          role="tab"
+          aria-selected={mode === "chat"}
+          aria-controls={mode === "chat" ? "ask-ai-panel" : undefined}
+          onClick={() => setMode("chat")}
+          className={`flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-semibold whitespace-nowrap transition ${
+            mode === "chat"
+              ? "border-[#5B6CFA] bg-[#5B6CFA]/15 text-[#494bd2] dark:text-[#a5b4fc]"
+              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-[#141926] dark:text-slate-200 dark:hover:bg-[#1C2336]"
+          }`}
         >
-          <span>Learn</span>
-          <span className="text-xs">(Phase 2)</span>
-        </div>
+          Ask AI
+        </button>
       </div>
 
       {mode === "flashcards" ? (
         <FlashcardViewer cards={detail.cards} />
-      ) : (
+      ) : mode === "test" ? (
         <TestMode
           setId={setId}
           cards={detail.cards}
@@ -322,9 +331,13 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
             void loadSet(true);
           }}
         />
+      ) : (
+        <div id="ask-ai-panel" role="tabpanel" aria-labelledby="ask-ai-tab">
+          <StudyChat key={setId} setId={setId} title={detail.set.title} />
+        </div>
       )}
 
-      <section aria-labelledby="terms-list-heading" className="space-y-4 pt-4">
+      <section hidden={mode === "chat"} aria-labelledby="terms-list-heading" className="space-y-4 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="terms-list-heading" className="text-lg font-bold">
             Terms in this set (<span className="font-mono-nums">{detail.cards.length}</span>)

@@ -487,7 +487,7 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-[#141926]">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {tab === "gdrive" ? "Google Drive import" : "Lecture audio recording"} is coming in Phase 2.
+                    {tab === "gdrive" ? "Google Drive import" : "Lecture audio recording"} is not available yet.
                   </p>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Switch to Paste text or Upload files to generate flashcards and a study guide now.

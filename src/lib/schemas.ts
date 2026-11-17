@@ -66,6 +66,13 @@ export const quizAttemptInputSchema = z.object({
   total: z.number().int().min(1),
 });
 
+export const MAX_CHAT_QUESTION_CHARS = 1000;
+
+export const studyChatInputSchema = z.object({
+  requestId: z.uuid(),
+  question: z.string().trim().min(1, "Enter a question.").max(MAX_CHAT_QUESTION_CHARS, "Use 1,000 characters or fewer."),
+});
+
 export const pastedTextSchema = z.object({
   text: z
     .string()

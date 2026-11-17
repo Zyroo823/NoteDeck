@@ -22,6 +22,7 @@ const documents: Record<LegalDocument, { title: string; sections: { heading: str
         heading: "Information the app stores",
         paragraphs: [
           "For an account, NoteDeck stores your name, email address, password hash when you use password sign-in, and Google account identifier when you use Google sign-in. It stores the study sets, flashcards, guides, folders, quiz attempts, and generation jobs you create. A completed generation job keeps its generated preview until the job is removed with your account.",
+          "When you generate a set, NoteDeck keeps the extracted source text for Ask AI. The text moves from the generation job to the set when you save it. NoteDeck stores Ask AI questions and answers with the set. Clear chat removes the saved conversation, and deleting the set removes its saved source and chat.",
           "Signup asks only for a name, email, and password, or the basic identity needed for Google sign-in. It does not ask for your date of birth, phone number, location, or payment details. The app cannot prevent personal details from being typed into study notes or uploaded files.",
           "The server uses your connection IP address in memory for rate limiting. The hosting provider may process connection and service logs under its own terms. The app stores your theme choice in your browser’s local storage.",
         ],
@@ -30,6 +31,7 @@ const documents: Record<LegalDocument, { title: string; sections: { heading: str
         heading: "How information is used and shared",
         paragraphs: [
           "Account details are used to authenticate you and control access to your materials. Your materials are used to display, edit, and organize your study work. If you choose AI generation, the notes or uploaded file content you submit is sent to Google Gemini to generate study materials. Google also handles sign-in when you choose Google sign-in. The app does not currently include advertising or analytics services.",
+          "When you ask a question in Ask AI, NoteDeck sends it to Gemini along with relevant source text or flashcards and a limited number of recent chat turns.",
           "Do not submit sensitive personal information or another person’s private information in notes or files. Review Google’s own terms and privacy information for its processing of data sent to its services.",
         ],
       },

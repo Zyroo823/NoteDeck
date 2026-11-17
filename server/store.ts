@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import type { StudyGuideContent, AiGenerationOutput } from "../src/lib/schemas";
+import type { StudyChatTurn } from "../src/types/api";
 
 export interface UserRecord {
   id: string;
@@ -17,12 +18,19 @@ export interface UserRecord {
   createdAt: string;
 }
 
+export interface StudySource {
+  text: string;
+  truncated: boolean;
+}
+
 export interface StudySetRecord {
   id: string;
   userId: string;
   folderId: string | null;
   title: string;
   sourceType: "manual" | "ai" | "audio";
+  studySource?: StudySource;
+  chatTurns?: StudyChatTurn[];
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +78,7 @@ export interface GenerationJobRecord {
   status: "pending" | "processing" | "done" | "failed";
   stepMessage: string;
   sourceKind: "text" | "file" | "audio";
+  studySource?: StudySource;
   previewResult: AiGenerationOutput | null;
   resultSetId: string | null;
   resultGuideId: string | null;

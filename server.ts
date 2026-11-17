@@ -16,6 +16,7 @@ import {
   quizAttemptInputSchema,
   saveGeneratedResultSchema,
   signupSchema,
+  studyChatInputSchema,
   studySetInputSchema,
   updateGuideSchema,
 } from "./src/lib/schemas";
@@ -28,9 +29,10 @@ import {
   verifyPassword,
   verifySessionToken,
   writeDb,
+  type StudySetRecord,
 } from "./server/store";
 import { extractFromUploadedFiles } from "./server/extract";
-import { generateStudyMaterials } from "./server/ai";
+import { answerStudyQuestion, captureStudySource, generateStudyMaterials } from "./server/ai";
 import { registerGoogleAuth } from "./server/google-auth";
 import { rateLimit } from "./server/rate-limit";
 import { openStudyData } from "./server/study-data";
@@ -39,6 +41,7 @@ import { TERMS_VERSION } from "./src/lib/legal";
 const COOKIE_NAME = "notedeck_session";
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const DAILY_CAP = Number(process.env.DAILY_GENERATION_LIMIT ?? 5) || 5;
+const MAX_SAVED_CHAT_TURNS = 100;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -81,8 +84,24 @@ function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): voi
   next();
 }
 
+function publicStudySet({ studySource, chatTurns, ...set }: StudySetRecord) {
+  return set;
+}
+
+function openChatSet(req: AuthedRequest, res: Response) {
+  const { data, save } = openStudyData(req.userId!);
+  const set = data.studySets.find((record) => record.id === req.params.id);
+  res.set("Cache-Control", "private, no-store");
+  if (!set) {
+    res.status(403).json({ error: "Ask AI is available only to the owner of this set." });
+    return null;
+  }
+  return { data, set, save };
+}
+
 async function startServer() {
   const app = express();
+  const chatsInProgress = new Set<string>();
   app.use(cookieParser(process.env.SESSION_SECRET));
   app.use(express.json({ limit: "2mb" }));
 
@@ -212,8 +231,8 @@ async function startServer() {
       quizAttempts: db.quizAttempts.filter((record) => record.userId === user.id),
       generationJobs: db.generationJobs
         .filter((record) => record.userId === user.id)
-        .map(({ id, status, sourceKind, previewResult, resultSetId, resultGuideId, createdAt, updatedAt }) =>
-          ({ id, status, sourceKind, previewResult, resultSetId, resultGuideId, createdAt, updatedAt })),
+        .map(({ id, status, sourceKind, previewResult, studySource, resultSetId, resultGuideId, createdAt, updatedAt }) =>
+          ({ id, status, sourceKind, previewResult, studySource, resultSetId, resultGuideId, createdAt, updatedAt })),
     };
 
     res.set({
@@ -552,7 +571,7 @@ async function startServer() {
       .slice(0, 5);
 
     res.json({
-      set,
+      set: publicStudySet(set),
       creatorName: owner?.name ?? "You",
       cards,
       linkedGuideId: linkedGuide?.id ?? null,
@@ -590,7 +609,7 @@ async function startServer() {
     db.cards.push(...updatedCards);
     save();
 
-    res.json({ set, cards: updatedCards });
+    res.json({ set: publicStudySet(set), cards: updatedCards });
   });
 
   app.delete("/api/sets/:id", requireAuth, (req: AuthedRequest, res) => {
@@ -616,6 +635,108 @@ async function startServer() {
 
     res.json({ ok: true });
   });
+
+  app.route("/api/sets/:id/chat")
+    .get(requireAuth, (req: AuthedRequest, res) => {
+      const chat = openChatSet(req, res);
+      if (!chat) return;
+      res.json({
+        turns: chat.set.chatTurns ?? [],
+        source: chat.set.studySource ? "notes" : "cards",
+        sourceTruncated: chat.set.studySource?.truncated ?? false,
+      });
+    })
+    .post(
+      requireAuth,
+      rateLimit("study-chat", 10, "Too many questions. Wait a minute and try again.", (req: AuthedRequest) => req.userId!),
+      async (req: AuthedRequest, res) => {
+        const chat = openChatSet(req, res);
+        if (!chat) return;
+        const { data, set } = chat;
+        const parsed = studyChatInputSchema.safeParse(req.body);
+        const question = parsed.success ? cleanPlainText(parsed.data.question) : "";
+        if (!parsed.success || !question) {
+          res.status(400).json({
+            error: parsed.success ? "Enter a question." : parsed.error.issues[0]?.message ?? "Invalid question.",
+          });
+          return;
+        }
+        const { requestId } = parsed.data;
+        const turns = set.chatTurns ?? [];
+        const savedTurn = turns.find((turn) => turn.id === requestId);
+        if (savedTurn) {
+          if (savedTurn.question !== question) {
+            res.status(409).json({ error: "This request has already been used for a different question." });
+            return;
+          }
+          res.json({ turns });
+          return;
+        }
+        if (chatsInProgress.has(set.id)) {
+          res.status(409).json({ error: "An answer is already in progress for this set. Try again in a moment." });
+          return;
+        }
+        if (turns.length >= MAX_SAVED_CHAT_TURNS) {
+          res.status(409).json({ error: "This chat is full. Clear it to start a new conversation." });
+          return;
+        }
+
+        const cards = data.cards
+          .filter((card) => card.setId === set.id)
+          .sort((a, b) => a.position - b.position);
+        const terms = cards.map((card) => card.term);
+        const source = set.studySource?.text ?? cards
+          .map((card) => `${card.term}: ${card.definition}`)
+          .join("\n\n");
+        if (!source.trim()) {
+          res.status(422).json({ error: "Add a flashcard to give Ask AI some material to use." });
+          return;
+        }
+
+        chatsInProgress.add(set.id);
+        try {
+          let answer: string;
+          try {
+            answer = await answerStudyQuestion(source, terms, question, turns);
+          } catch {
+            res.status(502).json({ error: "Could not get an answer from Gemini. Please try again." });
+            return;
+          }
+
+          // The account or set may have been removed while Gemini was answering.
+          if (verifySessionToken(req.cookies?.[COOKIE_NAME]) !== req.userId) {
+            res.status(401).json({ error: "Your session expired. Please log in again." });
+            return;
+          }
+          const latest = openChatSet(req, res);
+          if (!latest) return;
+          const updatedTurns = [
+            ...(latest.set.chatTurns ?? []),
+            { id: requestId, question, answer, createdAt: new Date().toISOString() },
+          ];
+          latest.set.chatTurns = updatedTurns;
+          latest.save();
+          res.json({ turns: updatedTurns });
+        } catch {
+          res.status(500).json({ error: "Could not save the answer. Please try again." });
+        } finally {
+          chatsInProgress.delete(set.id);
+        }
+      },
+    )
+    .delete(requireAuth, (req: AuthedRequest, res) => {
+      const chat = openChatSet(req, res);
+      if (!chat) return;
+      if (chatsInProgress.has(chat.set.id)) {
+        res.status(409).json({ error: "Wait for the current answer before clearing the chat." });
+        return;
+      }
+      if (chat.set.chatTurns?.length) {
+        delete chat.set.chatTurns;
+        chat.save();
+      }
+      res.json({ turns: [] });
+    });
 
   app.post("/api/sets/:id/cards", requireAuth, (req: AuthedRequest, res) => {
     const parsed = cardInputSchema.safeParse(req.body);
@@ -894,6 +1015,7 @@ async function startServer() {
             throw new Error("Could not extract readable text from the uploaded file.");
           }
 
+          const studySource = await captureStudySource(sourcePayload);
           const result = await generateStudyMaterials(sourcePayload, (stepMessage) => {
             const { data: currentDb, save } = openStudyData(userId);
             const target = currentDb.generationJobs.find((j) => j.id === jobId);
@@ -910,6 +1032,7 @@ async function startServer() {
             target.status = "done";
             target.stepMessage = "Ready to review";
             target.previewResult = result;
+            target.studySource = studySource;
             target.updatedAt = new Date().toISOString();
             save();
           }
@@ -938,7 +1061,8 @@ async function startServer() {
       res.status(404).json({ error: "Generation job not found." });
       return;
     }
-    res.json({ job });
+    const { studySource, ...previewJob } = job;
+    res.json({ job: previewJob });
   });
 
   app.post("/api/generate/:id/save", requireAuth, (req: AuthedRequest, res) => {
@@ -948,6 +1072,18 @@ async function startServer() {
     );
     if (!job) {
       res.status(404).json({ error: "Generation job not found." });
+      return;
+    }
+    if (job.status !== "done") {
+      res.status(409).json({ error: "Wait for generation to finish before saving." });
+      return;
+    }
+    if (job.resultSetId && job.resultGuideId) {
+      if (!db.studySets.some((set) => set.id === job.resultSetId)) {
+        res.status(409).json({ error: "The set from this generation was deleted. Generate again to create a new one." });
+        return;
+      }
+      res.json({ setId: job.resultSetId, guideId: job.resultGuideId });
       return;
     }
 
@@ -968,6 +1104,7 @@ async function startServer() {
       folderId: null,
       title: cleanTitle,
       sourceType: "ai",
+      studySource: job.studySource,
       createdAt: now,
       updatedAt: now,
     });
@@ -1003,6 +1140,7 @@ async function startServer() {
 
     job.resultSetId = setId;
     job.resultGuideId = guideId;
+    delete job.studySource;
     job.updatedAt = now;
     save();
 

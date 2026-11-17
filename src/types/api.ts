@@ -71,6 +71,19 @@ export interface StudySetDetail {
   attempts: QuizAttemptSummary[];
 }
 
+export interface StudyChatTurn {
+  id: string;
+  question: string;
+  answer: string;
+  createdAt: string;
+}
+
+export interface StudyChatDetail {
+  turns: StudyChatTurn[];
+  source: "notes" | "cards";
+  sourceTruncated: boolean;
+}
+
 export interface StudyGuideDetail {
   id: string;
   setId: string | null;
