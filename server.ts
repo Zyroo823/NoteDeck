@@ -38,7 +38,7 @@ import {
   type UserRecord,
 } from "./server/store";
 import { extractFromUploadedFiles, UploadContentError, type ExtractedSourcePayload } from "./server/extract";
-import { answerStudyQuestion, captureStudySource, generateStudyMaterials } from "./server/ai";
+import { answerStudyQuestion, captureStudySource, generateStudyMaterials, isGeminiUnavailable } from "./server/ai";
 import { registerGoogleAuth } from "./server/google-auth";
 import { rateLimit } from "./server/rate-limit";
 import { DELETION_COOKIE, SESSION_COOKIE, hasDeletionProof, requireSameOrigin, route, setSecurityHeaders } from "./server/security";
@@ -1076,9 +1076,12 @@ async function startServer() {
             if (!await updateGenerationJob(userId, jobId, { stepMessage })) throw new Error("Generation was cancelled.");
           });
           await updateGenerationJob(userId, jobId, { status: "done", stepMessage: "Ready to review", previewResult: result, studySource });
-        } catch {
+        } catch (error) {
           await updateGenerationJob(userId, jobId, {
-            status: "failed", stepMessage: "Failed", error: "Could not generate study material. Check your source and try again.",
+            status: "failed", stepMessage: "Failed",
+            error: isGeminiUnavailable(error)
+              ? "Gemini is busy right now. Wait a moment and try again."
+              : "Could not generate study material. Check your source and try again.",
           });
         }
       })().catch(() => console.error("Could not save generation status."));

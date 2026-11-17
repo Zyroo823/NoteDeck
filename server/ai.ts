@@ -1,11 +1,12 @@
-import { FinishReason, GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import { aiGenerationOutputSchema, type AiGenerationOutput } from "../src/lib/schemas";
 import { cleanPlainText } from "../src/lib/studyLogic";
 import type { StudyChatTurn } from "../src/types/api";
 import type { ExtractedSourcePayload } from "./extract";
 import type { StudySource } from "./store";
 
-const ASK_AI_MODEL = "gemini-3.5-flash-lite";
+const GENERATION_MODEL = "gemini-4-hydrogen";
+const FLASH_LITE_MODEL = "gemini-3.5-flash-lite";
 const MAX_SAVED_SOURCE_CHARS = 120_000;
 const CHAT_CONTEXT_CHARS = 32_000;
 const CHAT_CHUNK_CHARS = 4_000;
@@ -115,11 +116,16 @@ function buildContentParts(source: ExtractedSourcePayload, retryHint?: string) {
   return parts;
 }
 
+export function isGeminiUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 503;
+}
+
 export async function generateStudyMaterials(
   source: ExtractedSourcePayload,
   onStage?: (message: string) => void | Promise<void>
 ): Promise<AiGenerationOutput> {
   const ai = getGeminiClient();
+  let model = GENERATION_MODEL;
   let lastError = "Invalid response structure";
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -128,8 +134,8 @@ export async function generateStudyMaterials(
     }
 
     const parts = buildContentParts(source, attempt === 1 ? lastError : undefined);
-    const response = await ai.models.generateContent({
-      model: "gemini-4-hydrogen",
+    const request = {
+      model,
       contents: { parts },
       config: {
         systemInstruction: SYSTEM_INSTRUCTIONS,
@@ -137,6 +143,11 @@ export async function generateStudyMaterials(
         responseSchema: RESPONSE_SCHEMA,
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       },
+    };
+    const response = await ai.models.generateContent(request).catch((error: unknown) => {
+      if (model !== GENERATION_MODEL || !isGeminiUnavailable(error)) throw error;
+      model = FLASH_LITE_MODEL;
+      return ai.models.generateContent({ ...request, model });
     });
 
     if (onStage && attempt === 0) {
@@ -171,7 +182,7 @@ export async function captureStudySource(source: ExtractedSourcePayload): Promis
     const ai = getGeminiClient();
     for (const pdf of source.pdfFiles) {
       const response = await ai.models.generateContent({
-        model: ASK_AI_MODEL,
+        model: FLASH_LITE_MODEL,
         contents: {
           parts: [
             { inlineData: { mimeType: "application/pdf", data: pdf.base64 } },
@@ -241,7 +252,7 @@ export async function answerStudyQuestion(
 ): Promise<string> {
   const recentTurns = history.slice(-CHAT_HISTORY_TURNS).map(({ question, answer }) => ({ question, answer }));
   const response = await getGeminiClient().models.generateContent({
-    model: ASK_AI_MODEL,
+    model: FLASH_LITE_MODEL,
     contents: JSON.stringify({
       source: selectChatSource(source, question, recentTurns.at(-1)?.question ?? ""),
       terms,
