@@ -18,6 +18,8 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [mode, setMode] = useState<"flashcards" | "test">(initialMode);
+  const [showDefinitions, setShowDefinitions] = useState(false);
+  const [revealedCardIds, setRevealedCardIds] = useState<Set<string>>(() => new Set());
 
   // Inline card editing state
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -59,8 +61,22 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
   }, [setId]);
 
   useEffect(() => {
+    setShowDefinitions(false);
+    setRevealedCardIds(new Set());
     void loadSet();
   }, [loadSet]);
+
+  function toggleDefinition(cardId: string) {
+    setRevealedCardIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+  }
 
   async function handleDeleteSet() {
     setDeleting(true);
@@ -314,17 +330,31 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
             Terms in this set (<span className="font-mono-nums">{detail.cards.length}</span>)
           </h2>
 
-          <button
-            type="button"
-            onClick={() => {
-              setAddingCard((prev) => !prev);
-              setCardError("");
-            }}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition hover:bg-slate-100 dark:border-slate-700 dark:bg-[#141926] dark:hover:bg-[#1C2336]"
-          >
-            <Plus className="h-4 w-4" />
-            Add term
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={showDefinitions}
+                onChange={(event) => {
+                  setShowDefinitions(event.target.checked);
+                  setRevealedCardIds(new Set());
+                }}
+                className="size-4 shrink-0 accent-[#494bd2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4547cd]"
+              />
+              Show definitions
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setAddingCard((prev) => !prev);
+                setCardError("");
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition hover:bg-slate-100 dark:border-slate-700 dark:bg-[#141926] dark:hover:bg-[#1C2336]"
+            >
+              <Plus className="h-4 w-4" />
+              Add term
+            </button>
+          </div>
         </div>
 
         {cardError ? (
@@ -391,6 +421,7 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
         <div className="space-y-3">
           {detail.cards.map((card) => {
             const isEditing = editingCardId === card.id;
+            const definitionVisible = showDefinitions || revealedCardIds.has(card.id);
             return (
               <div
                 key={card.id}
@@ -453,13 +484,30 @@ export function StudySetView({ setId, initialMode, onNavigate }: StudySetViewPro
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-4">
-                    <div className="grid flex-1 gap-3 sm:grid-cols-12 sm:gap-6">
-                      <p className="font-semibold text-slate-900 dark:text-white sm:col-span-4">
-                        {card.term}
-                      </p>
-                      <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:col-span-8">
-                        {card.definition}
-                      </p>
+                    <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-12 sm:gap-6">
+                      <div className={`font-semibold wrap-break-word text-slate-900 dark:text-white ${definitionVisible ? "sm:col-span-4" : "sm:col-span-12"}`}>
+                        {showDefinitions ? (
+                          <p>{card.term}</p>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-expanded={definitionVisible}
+                            onClick={() => toggleDefinition(card.id)}
+                            onKeyDown={(event) => {
+                              // Space activates this row instead of the flashcard viewer's shortcut.
+                              if (event.code === "Space") event.stopPropagation();
+                            }}
+                            className="w-full cursor-pointer text-left underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B6CFA]"
+                          >
+                            {card.term}
+                          </button>
+                        )}
+                      </div>
+                      {definitionVisible ? (
+                        <p className="text-sm leading-relaxed wrap-break-word text-slate-600 dark:text-slate-300 sm:col-span-8">
+                          {card.definition}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="flex shrink-0 items-center gap-1">
