@@ -438,13 +438,13 @@ export function GenerateModal({ open, onClose, onSaved }: GenerateModalProps) {
                       Drag and drop notes, readings, lecture slides, etc.
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Upload up to 2 files at a time up to 25MB (.docx, .pdf, .pptx)
+                      Upload up to 2 PDFs or PowerPoint files, each up to 25 MB and 80 pages or slides.
                     </p>
 
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.docx,.pptx"
+                      accept=".pdf,.pptx"
                       multiple
                       onChange={handleFileInputChange}
                       className="hidden"

@@ -6,6 +6,8 @@ export interface AuthUser {
   name: string;
   email: string;
   role?: "admin" | "user";
+  hasPassword?: boolean;
+  hasGoogle?: boolean;
 }
 
 export interface JumpBackInItem {

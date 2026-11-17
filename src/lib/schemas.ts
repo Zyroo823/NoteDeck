@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Skip generated validators in the browser so validation works under the production CSP.
+if (typeof window !== "undefined") z.config({ jitless: true });
+
 export const signupSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(60, "Name is too long"),
   email: z.string().trim().email("Enter a valid email address"),
@@ -9,6 +12,7 @@ export const signupSchema = z.object({
 
 export const accountDeletionSchema = z.object({
   email: z.string().trim().email("Enter your account email to confirm deletion."),
+  password: z.string().max(72).optional(),
 });
 
 export const loginSchema = z.object({

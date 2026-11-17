@@ -46,15 +46,10 @@ export interface MarkdownLineToken {
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_UPLOAD_FILES = 2;
 
-const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".pptx"];
-const ALLOWED_MIME_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  // Some browsers send empty or octet-stream MIME for office files
-  "application/octet-stream",
-  "",
-];
+const UPLOAD_MIME_BY_EXTENSION: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
 
 export function cleanPlainText(value: string): string {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
@@ -129,23 +124,23 @@ export function gradeQuiz(
 
 export function validateUploadFiles(files: UploadFileCandidate[]): UploadValidationResult {
   if (files.length === 0) {
-    return { valid: false, error: "Select at least one .docx, .pdf, or .pptx file." };
+    return { valid: false, error: "Select at least one PDF or PowerPoint file." };
   }
   if (files.length > MAX_UPLOAD_FILES) {
     return { valid: false, error: "Upload up to 2 files at a time." };
   }
 
   for (const file of files) {
-    const lowerName = file.name.toLowerCase();
-    const hasValidExt = ALLOWED_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
-    if (!hasValidExt) {
+    const extension = file.name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] ?? "";
+    const mimeType = UPLOAD_MIME_BY_EXTENSION[extension];
+    if (!mimeType) {
       return {
         valid: false,
-        error: `"${file.name}" is not supported. Use .docx, .pdf, or .pptx files only.`,
+        error: `"${file.name}" is not supported. Upload PDF or PowerPoint files, or paste your notes.`,
       };
     }
 
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    if (file.type && file.type !== "application/octet-stream" && file.type !== mimeType) {
       return {
         valid: false,
         error: `"${file.name}" has an unsupported file type (${file.type}).`,

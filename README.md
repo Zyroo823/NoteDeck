@@ -15,7 +15,7 @@ Create flashcards, explore study guides, and practice what you've learned—all 
 ## What you can do
 
 - **Make study sets** and edit your own flashcards.
-- **Generate study materials** from pasted notes or PDF, DOCX, and PPTX files using Gemini.
+- **Generate study materials** from pasted notes or PDF and PowerPoint files using Gemini.
 - **Review with flashcards** and practice with multiple-choice quizzes.
 - **Keep your materials together** in a personal library with study guides and quiz history.
 - **Create an account** with a password or sign in with Gmail when configured.
@@ -62,9 +62,9 @@ The first successful Gmail sign-in creates a NoteDeck account, or links the veri
 
 ### Rate limits and account access
 
-Signup, password login, and Gmail OAuth requests are limited per client IP. AI generation is limited per account before file parsing and still has the daily quota. These counters are in memory and apply within one server process. By default the app uses the connection IP and ignores forwarded IP headers.
+Signup, password login, and Google OAuth requests are limited per client IP. Uploads and AI requests are also limited per account before file parsing or provider calls. These counters apply within one server process. The app uses the connection IP and ignores forwarded IP headers.
 
-NoteDeck's local JSON store enforces study record ownership in application code. Decks, cards, guides, attempts, and generation jobs are scoped to the signed-in account. The JSON store does not support database-native row-level security.
+The server scopes decks, cards, guides, folders, attempts, chat, and generation jobs to the signed-in account. Browser writes require the NoteDeck origin. Session cookies expire after seven days, and deactivation invalidates existing sessions. Account deletion requires the current password or a fresh confirmation with the account’s linked Google identity.
 
 ### Administrator access
 
@@ -89,15 +89,23 @@ docs/agents/  Project guidance for installed agent skills
 | `npm run dev` | Starts the local app and API |
 | `npm run lint` | Runs the TypeScript check |
 | `npm run build` | Builds the frontend for production |
+| `npm run import:data -- path/to/db.json` | Imports a trusted JSON backup into an empty PostgreSQL store |
 
 ## Data and configuration
 
-NoteDeck stores account and study data locally in `.data/db.json`. This directory and `.env` files are ignored by Git. The app supports up to two uploaded files per generation request, with a limit of 25 MB per file. `DAILY_GENERATION_LIMIT` can be set in the environment; the default is five generations per user per day.
+Local development uses `.data/db.json` when `DATABASE_URL` is absent. That directory and local `.env` files are ignored by Git. Production requires a PostgreSQL connection string in `DATABASE_URL` and an existing `SESSION_SECRET` of at least 32 characters.
 
-The current storage and session configuration is intended for local development. Review persistence, session secrets, and deployment security before hosting the app for others.
+1. Run [the storage SQL](server/sql/study-store.sql) in the target PostgreSQL database, such as the Supabase SQL Editor. Keep the `notedeck_private` schema out of the Supabase Data API. The app connects with the role that owns the private table.
+2. Set `DATABASE_URL` in your server’s environment. For a persistent server that needs IPv4, choose the Supabase **Session pooler** connection string. Remote connections verify TLS certificates.
+3. For a cutover, stop writes to the old store and keep a trusted copy of its `.data/db.json`. From an environment pointing at the empty target, run `npm run import:data -- path/to/db.json` before accepting traffic. The import refuses to overwrite a populated store.
+4. Start NoteDeck and verify sign-in and existing study data. Without a backup, set up the database for a fresh start.
+
+The app stores the existing data model in a private JSONB record. Writes compare the stored revision so a concurrent request cannot overwrite a newer update. A write conflict returns HTTP 409 and can be retried.
+
+Generation accepts up to two PDFs or PowerPoint files per request. Each file is limited to 25 MB and 80 pages or slides. For Word documents, paste the text or export to PDF. `DAILY_GENERATION_LIMIT` defaults to five generations per account per day.
 
 ## Privacy and legal status
 
-New account signup requires agreement to the current Terms of Service version. Settings includes a JSON data export and account deletion; deletion removes account-linked rows from the active app data file and does not request deletion from Google or hosting providers. The app uses essential sign-in cookies only, so it currently has no cookie consent banner; theme preference is stored in local storage.
+New account signup requires agreement to the current Terms of Service version. Settings includes a JSON data export and account deletion. Deletion removes account-linked records from NoteDeck’s active store and does not request deletion from Google or hosting providers. Theme preference is stored in local storage.
 
 The Privacy Policy and Terms are pre-launch drafts. The operator is John Mar Aledon, based in the Philippines, and the privacy contact is johnmaraledon823@gmail.com. Supported countries, age policy, and inactive-account retention still need owner decisions and legal review. The current app has no paid plans, checkout, marketing email subscriptions, public reviews, or third-party analytics. Do not treat these pages or code changes as a guarantee against legal claims.

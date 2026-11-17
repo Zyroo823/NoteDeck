@@ -117,14 +117,14 @@ function buildContentParts(source: ExtractedSourcePayload, retryHint?: string) {
 
 export async function generateStudyMaterials(
   source: ExtractedSourcePayload,
-  onStage?: (message: string) => void
+  onStage?: (message: string) => void | Promise<void>
 ): Promise<AiGenerationOutput> {
   const ai = getGeminiClient();
   let lastError = "Invalid response structure";
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (onStage) {
-      onStage(attempt === 0 ? "Creating flashcards..." : "Refining study guide structure...");
+      await onStage(attempt === 0 ? "Creating flashcards..." : "Refining study guide structure...");
     }
 
     const parts = buildContentParts(source, attempt === 1 ? lastError : undefined);
@@ -140,7 +140,7 @@ export async function generateStudyMaterials(
     });
 
     if (onStage && attempt === 0) {
-      onStage("Writing study guide...");
+      await onStage("Writing study guide...");
     }
 
     const rawText = (response.text ?? "").trim();

@@ -23,6 +23,11 @@ import {
 import { cleanPlainText, validateUploadFiles } from "./src/lib/studyLogic";
 import {
   countGenerationsToday,
+  initializeStorage,
+  SESSION_DURATION_MS,
+  StoreConflict,
+  type DatabaseState,
+  type GenerationJobRecord,
   createSessionToken,
   hashPassword,
   readDb,
@@ -32,14 +37,15 @@ import {
   type StudySetRecord,
   type UserRecord,
 } from "./server/store";
-import { extractFromUploadedFiles } from "./server/extract";
+import { extractFromUploadedFiles, UploadContentError, type ExtractedSourcePayload } from "./server/extract";
 import { answerStudyQuestion, captureStudySource, generateStudyMaterials } from "./server/ai";
 import { registerGoogleAuth } from "./server/google-auth";
 import { rateLimit } from "./server/rate-limit";
+import { DELETION_COOKIE, SESSION_COOKIE, hasDeletionProof, requireSameOrigin, route, setSecurityHeaders } from "./server/security";
 import { openStudyData } from "./server/study-data";
 import { TERMS_VERSION } from "./src/lib/legal";
 
-const COOKIE_NAME = "notedeck_session";
+const COOKIE_NAME = SESSION_COOKIE;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const DAILY_CAP = Number(process.env.DAILY_GENERATION_LIMIT ?? 5) || 5;
 const MAX_SAVED_CHAT_TURNS = 100;
@@ -49,42 +55,51 @@ const upload = multer({
   limits: {
     fileSize: MAX_UPLOAD_BYTES,
     files: 2,
+    fields: 0,
+    parts: 3,
   },
 });
 
 interface AuthedRequest extends Request {
   userId?: string;
+  db?: DatabaseState;
 }
 
-function setSessionCookie(res: Response, userId: string, secure = process.env.NODE_ENV === "production"): void {
-  const token = createSessionToken(userId);
+function setSessionCookie(res: Response, user: UserRecord, secure = process.env.NODE_ENV === "production"): void {
+  const token = createSessionToken(user);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     secure,
     sameSite: "lax",
     path: "/",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: SESSION_DURATION_MS,
   });
 }
 
-function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): void {
+const requireAuth = route(async (req: AuthedRequest, res, next) => {
   const token = req.cookies?.[COOKIE_NAME] as string | undefined;
-  const userId = verifySessionToken(token);
-  if (!userId) {
+  if (!token) {
     res.status(401).json({ error: "Please log in to continue." });
     return;
   }
-  const db = readDb();
-  const exists = db.users.some((u) => u.id === userId);
-  if (!exists) {
-    res.clearCookie(COOKIE_NAME);
+  const db = await readDb();
+  const userId = verifySessionToken(token, db);
+  if (!userId) {
+    res.clearCookie(COOKIE_NAME, { path: "/" });
     res.status(401).json({ error: "Session expired. Please log in again." });
     return;
   }
   req.userId = userId;
+  req.db = db;
   next();
-}
+});
 
+function publicUser(user: UserRecord) {
+  return {
+    id: user.id, name: user.name, email: user.email, role: user.role ?? "user",
+    hasPassword: Boolean(user.passwordHash), hasGoogle: Boolean(user.googleSubject),
+  };
+}
 function publicStudySet({ studySource, chatTurns, ...set }: StudySetRecord) {
   return set;
 }
@@ -95,7 +110,7 @@ function isLastActiveAdmin(user: UserRecord, users: UserRecord[]): boolean {
 }
 
 function openChatSet(req: AuthedRequest, res: Response) {
-  const { data, save } = openStudyData(req.userId!);
+  const { data, save } = openStudyData(req.userId!, req.db!);
   const set = data.studySets.find((record) => record.id === req.params.id);
   res.set("Cache-Control", "private, no-store");
   if (!set) {
@@ -105,21 +120,45 @@ function openChatSet(req: AuthedRequest, res: Response) {
   return { data, set, save };
 }
 
+async function updateGenerationJob(userId: string, jobId: string, update: Partial<GenerationJobRecord>) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const db = await readDb();
+    if (!db.users.some((user) => user.id === userId && !user.suspended)) return false;
+    const job = db.generationJobs.find((entry) => entry.id === jobId && entry.userId === userId);
+    if (!job || job.status !== "processing") return false;
+    Object.assign(job, update, { updatedAt: new Date().toISOString() });
+    try {
+      await writeDb(db);
+      return true;
+    } catch (error) {
+      if (!(error instanceof StoreConflict) || attempt === 2) throw error;
+    }
+  }
+  return false;
+}
+
 async function startServer() {
+  if (process.env.NODE_ENV === "production" && (process.env.SESSION_SECRET?.trim().length ?? 0) < 32) {
+    throw new Error("Production requires a SESSION_SECRET of at least 32 characters.");
+  }
+  await initializeStorage();
   const app = express();
+  app.disable("x-powered-by");
+  app.use(setSecurityHeaders);
+  app.use("/api", requireSameOrigin);
   const chatsInProgress = new Set<string>();
   app.use(cookieParser(process.env.SESSION_SECRET));
   app.use(express.json({ limit: "2mb" }));
 
   // --- Auth Routes ---
-  app.post("/api/auth/signup", rateLimit("signup", 10, "Too many signup attempts. Wait a minute and try again."), (req, res) => {
+  app.post("/api/auth/signup", rateLimit("signup", 10, "Too many signup attempts. Wait a minute and try again."), route(async (req: AuthedRequest, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid signup details" });
       return;
     }
 
-    const db = readDb();
+    const db = req.db ?? await readDb();
     const emailLower = parsed.data.email.toLowerCase();
     if (db.users.some((u) => u.email.toLowerCase() === emailLower)) {
       res.status(409).json({ error: "An account with this email already exists." });
@@ -137,21 +176,21 @@ async function startServer() {
     };
 
     db.users.push(newUser);
-    writeDb(db);
-    setSessionCookie(res, newUser.id);
+    await writeDb(db);
+    setSessionCookie(res, newUser);
     res.status(201).json({
-      user: { id: newUser.id, name: newUser.name, email: newUser.email },
+      user: publicUser(newUser),
     });
-  });
+  }));
 
-  app.post("/api/auth/login", rateLimit("login", 15, "Too many login attempts. Wait a minute and try again."), (req, res) => {
+  app.post("/api/auth/login", rateLimit("login", 15, "Too many login attempts. Wait a minute and try again."), route(async (req: AuthedRequest, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid login details" });
       return;
     }
 
-    const db = readDb();
+    const db = req.db ?? await readDb();
     const user = db.users.find((u) => u.email.toLowerCase() === parsed.data.email.toLowerCase());
     if (!user?.passwordHash || user.suspended || user.id === "user-demo-student" ||
         !verifyPassword(parsed.data.password, user.passwordHash)) {
@@ -159,11 +198,11 @@ async function startServer() {
       return;
     }
 
-    setSessionCookie(res, user.id);
+    setSessionCookie(res, user);
     res.json({
-      user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" },
+      user: publicUser(user),
     });
-  });
+  }));
 
   registerGoogleAuth(app, setSessionCookie);
 
@@ -172,14 +211,14 @@ async function startServer() {
     res.json({ ok: true });
   });
 
-  app.get("/api/auth/me", (req: AuthedRequest, res) => {
+  app.get("/api/auth/me", route(async (req: AuthedRequest, res) => {
     const token = req.cookies?.[COOKIE_NAME] as string | undefined;
-    const userId = verifySessionToken(token);
+    const db = await readDb();
+    const userId = verifySessionToken(token, db);
     if (!userId) {
       res.json({ user: null });
       return;
     }
-    const db = readDb();
     const user = db.users.find((u) => u.id === userId);
     if (!user) {
       res.clearCookie(COOKIE_NAME, { path: "/" });
@@ -187,31 +226,31 @@ async function startServer() {
       return;
     }
     res.json({
-      user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" },
+      user: publicUser(user),
       generationsUsedToday: countGenerationsToday(db, user.id),
       dailyGenerationLimit: DAILY_CAP,
     });
-  });
+  }));
 
-  app.patch("/api/profile", requireAuth, (req: AuthedRequest, res) => {
+  app.patch("/api/profile", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = profileUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid name" });
       return;
     }
-    const db = readDb();
+    const db = req.db ?? await readDb();
     const user = db.users.find((u) => u.id === req.userId);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
     user.name = cleanPlainText(parsed.data.name);
-    writeDb(db);
-    res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role ?? "user" } });
-  });
+    await writeDb(db);
+    res.json({ user: publicUser(user) });
+  }));
 
-  app.get("/api/account/export", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+  app.get("/api/account/export", requireAuth, route(async (req: AuthedRequest, res) => {
+    const db = req.db ?? await readDb();
     const user = db.users.find((record) => record.id === req.userId);
     if (!user) {
       res.status(404).json({ error: "Account not found." });
@@ -246,15 +285,9 @@ async function startServer() {
       "Content-Disposition": `attachment; filename="notedeck-data-${new Date().toISOString().slice(0, 10)}.json"`,
     });
     res.json(exportData);
-  });
+  }));
 
-  app.delete("/api/account", requireAuth, (req: AuthedRequest, res) => {
-    const origin = req.get("origin");
-    const host = req.get("host");
-    if (!origin || !host || !["http", "https"].some((scheme) => origin === `${scheme}://${host}`)) {
-      res.status(403).json({ error: "Invalid request origin." });
-      return;
-    }
+  app.delete("/api/account", requireAuth, rateLimit("delete-account", 5, "Too many deletion attempts. Wait a minute and try again.", (req: AuthedRequest) => req.userId!), route(async (req: AuthedRequest, res) => {
 
     const parsed = accountDeletionSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -262,7 +295,7 @@ async function startServer() {
       return;
     }
 
-    const db = readDb();
+    const db = req.db ?? await readDb();
     const user = db.users.find((record) => record.id === req.userId);
     if (!user) {
       res.status(404).json({ error: "Account not found." });
@@ -270,6 +303,12 @@ async function startServer() {
     }
     if (parsed.data.email.toLowerCase() !== user.email.toLowerCase()) {
       res.status(400).json({ error: "Enter the email address on your account to confirm deletion." });
+      return;
+    }
+    const passwordConfirmed = Boolean(user.passwordHash && parsed.data.password &&
+      verifyPassword(parsed.data.password, user.passwordHash));
+    if (!passwordConfirmed && !(user.googleSubject && hasDeletionProof(req, user.id))) {
+      res.status(403).json({ error: "Confirm your password or verify your linked Google account before deleting your account." });
       return;
     }
     if (isLastActiveAdmin(user, db.users)) {
@@ -286,19 +325,15 @@ async function startServer() {
     db.quizAttempts = db.quizAttempts.filter((record) => record.userId !== user.id);
     db.generationJobs = db.generationJobs.filter((record) => record.userId !== user.id);
     db.adminAudit = (db.adminAudit ?? []).filter((record) => record.actorId !== user.id && record.targetId !== user.id);
-    try {
-      writeDb(db);
-    } catch {
-      res.status(500).json({ error: "Account deletion could not be confirmed. Please try again." });
-      return;
-    }
+    await writeDb(db);
+    res.clearCookie(DELETION_COOKIE, { path: "/api/account" });
 
     res.clearCookie(COOKIE_NAME, { path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production" });
     res.json({ ok: true });
-  });
+  }));
 
-  app.get("/api/admin/users", requireAuth, (req: AuthedRequest, res) => {
-    const db = readDb();
+  app.get("/api/admin/users", requireAuth, route(async (req: AuthedRequest, res) => {
+    const db = req.db ?? await readDb();
     if (db.users.find((user) => user.id === req.userId)?.role !== "admin") {
       res.status(403).json({ error: "Administrator access required." });
       return;
@@ -306,16 +341,10 @@ async function startServer() {
     res.set("Cache-Control", "no-store");
     res.json({ users: db.users.map(({ id, name, email, role, suspended, createdAt }) =>
       ({ id, name, email, role: role ?? "user", suspended: suspended ?? false, createdAt })) });
-  });
+  }));
 
-  app.patch("/api/admin/users/:id", requireAuth, (req: AuthedRequest, res) => {
-    const origin = req.get("origin");
-    const host = req.get("host");
-    if (!origin || !host || !["http", "https"].some((scheme) => origin === `${scheme}://${host}`)) {
-      res.status(403).json({ error: "Invalid request origin." });
-      return;
-    }
-    const db = readDb();
+  app.patch("/api/admin/users/:id", requireAuth, route(async (req: AuthedRequest, res) => {
+    const db = req.db ?? await readDb();
     const actor = db.users.find((user) => user.id === req.userId);
     if (actor?.role !== "admin") {
       res.status(403).json({ error: "Administrator access required." });
@@ -361,13 +390,13 @@ async function startServer() {
       action = suspended ? "suspended" : "restored";
     }
     (db.adminAudit ??= []).push({ actorId: actor.id, targetId: target.id, action, createdAt: new Date().toISOString() });
-    writeDb(db);
+    await writeDb(db);
     res.json({ ok: true });
-  });
+  }));
 
   // --- Home & Library Routes ---
   app.get("/api/home", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db } = openStudyData(req.userId!);
+    const { data: db } = openStudyData(req.userId!, req.db!);
     const userId = req.userId!;
 
     const userSets = db.studySets
@@ -420,7 +449,7 @@ async function startServer() {
   });
 
   app.get("/api/library", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db } = openStudyData(req.userId!);
+    const { data: db } = openStudyData(req.userId!, req.db!);
     const userId = req.userId!;
     const q = cleanPlainText(typeof req.query.q === "string" ? req.query.q : "").toLowerCase();
 
@@ -456,11 +485,11 @@ async function startServer() {
 
   // --- Folders ---
   app.get("/api/folders", requireAuth, (req: AuthedRequest, res) => {
-    const { data } = openStudyData(req.userId!);
+    const { data } = openStudyData(req.userId!, req.db!);
     res.json({ folders: data.folders.map(({ id, name }) => ({ id, name })) });
   });
 
-  function saveFolderName(req: AuthedRequest, res: Response) {
+  const saveFolderName = route(async (req: AuthedRequest, res) => {
     const parsed = folderNameSchema.safeParse(
       typeof req.body?.name === "string" ? cleanPlainText(req.body.name) : ""
     );
@@ -469,7 +498,7 @@ async function startServer() {
       return;
     }
 
-    const { data, save } = openStudyData(req.userId!);
+    const { data, save } = openStudyData(req.userId!, req.db!);
     const folderId = req.params.id;
     const folder = folderId
       ? data.folders.find((entry) => entry.id === folderId)
@@ -480,21 +509,21 @@ async function startServer() {
     }
     folder.name = parsed.data;
     if (!folderId) data.folders.push(folder);
-    save();
+    await save();
     res.status(folderId ? 200 : 201).json({ folder: { id: folder.id, name: folder.name } });
-  }
+  });
 
   app.post("/api/folders", requireAuth, saveFolderName);
   app.patch("/api/folders/:id", requireAuth, saveFolderName);
 
-  app.patch("/api/folders/:id/items", requireAuth, (req: AuthedRequest, res) => {
+  app.patch("/api/folders/:id/items", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = folderItemInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Choose a study item." });
       return;
     }
 
-    const { data, save } = openStudyData(req.userId!);
+    const { data, save } = openStudyData(req.userId!, req.db!);
     const folder = data.folders.find((entry) => entry.id === req.params.id);
     const { kind, id, add } = parsed.data;
     const rows = kind === "set" ? data.studySets : data.studyGuides;
@@ -509,13 +538,13 @@ async function startServer() {
     }
     if (add || item.folderId === folder.id) {
       item.folderId = add ? folder.id : null;
-      save();
+      await save();
     }
     res.json({ folderId: item.folderId ?? null });
-  });
+  }));
 
-  app.delete("/api/folders/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data, save } = openStudyData(req.userId!);
+  app.delete("/api/folders/:id", requireAuth, route(async (req: AuthedRequest, res) => {
+    const { data, save } = openStudyData(req.userId!, req.db!);
     const folderId = req.params.id;
     const index = data.folders.findIndex((entry) => entry.id === folderId);
     if (index === -1) {
@@ -526,19 +555,19 @@ async function startServer() {
       if (item.folderId === folderId) item.folderId = null;
     }
     data.folders.splice(index, 1);
-    save();
+    await save();
     res.json({ ok: true });
-  });
+  }));
 
   // --- Study Sets & Cards ---
-  app.post("/api/sets", requireAuth, (req: AuthedRequest, res) => {
+  app.post("/api/sets", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = studySetInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid set fields" });
       return;
     }
 
-    const { data: db, save } = openStudyData(req.userId!);
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const now = new Date().toISOString();
     const setId = `set-${crypto.randomUUID()}`;
 
@@ -564,20 +593,20 @@ async function startServer() {
 
     db.studySets.push(newSet);
     db.cards.push(...newCards);
-    save();
+    await save();
 
     res.status(201).json({ set: newSet });
-  });
+  }));
 
-  app.get("/api/sets/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db } = openStudyData(req.userId!);
+  app.get("/api/sets/:id", requireAuth, route(async (req: AuthedRequest, res) => {
+    const { data: db } = openStudyData(req.userId!, req.db!);
     const set = db.studySets.find((s) => s.id === req.params.id && s.userId === req.userId);
     if (!set) {
       res.status(404).json({ error: "Study set not found." });
       return;
     }
 
-    const owner = readDb().users.find((u) => u.id === req.userId);
+    const owner = req.db!.users.find((u) => u.id === req.userId);
     const cards = db.cards
       .filter((c) => c.setId === set.id)
       .sort((a, b) => a.position - b.position);
@@ -598,16 +627,16 @@ async function startServer() {
       linkedGuideId: linkedGuide?.id ?? null,
       attempts,
     });
-  });
+  }));
 
-  app.patch("/api/sets/:id", requireAuth, (req: AuthedRequest, res) => {
+  app.patch("/api/sets/:id", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = studySetInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid set fields" });
       return;
     }
 
-    const { data: db, save } = openStudyData(req.userId!);
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const set = db.studySets.find((s) => s.id === req.params.id && s.userId === req.userId);
     if (!set) {
       res.status(404).json({ error: "Study set not found." });
@@ -628,13 +657,13 @@ async function startServer() {
       masteryStatus: "new" as const,
     }));
     db.cards.push(...updatedCards);
-    save();
+    await save();
 
     res.json({ set: publicStudySet(set), cards: updatedCards });
-  });
+  }));
 
-  app.delete("/api/sets/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db, save } = openStudyData(req.userId!);
+  app.delete("/api/sets/:id", requireAuth, route(async (req: AuthedRequest, res) => {
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const idx = db.studySets.findIndex(
       (s) => s.id === req.params.id && s.userId === req.userId
     );
@@ -652,10 +681,10 @@ async function startServer() {
         guide.setId = null;
       }
     }
-    save();
+    await save();
 
     res.json({ ok: true });
-  });
+  }));
 
   app.route("/api/sets/:id/chat")
     .get(requireAuth, (req: AuthedRequest, res) => {
@@ -670,7 +699,7 @@ async function startServer() {
     .post(
       requireAuth,
       rateLimit("study-chat", 10, "Too many questions. Wait a minute and try again.", (req: AuthedRequest) => req.userId!),
-      async (req: AuthedRequest, res) => {
+      route(async (req: AuthedRequest, res) => {
         const chat = openChatSet(req, res);
         if (!chat) return;
         const { data, set } = chat;
@@ -725,7 +754,8 @@ async function startServer() {
           }
 
           // The account or set may have been removed while Gemini was answering.
-          if (verifySessionToken(req.cookies?.[COOKIE_NAME]) !== req.userId) {
+          req.db = await readDb();
+          if (verifySessionToken(req.cookies?.[COOKIE_NAME], req.db) !== req.userId) {
             res.status(401).json({ error: "Your session expired. Please log in again." });
             return;
           }
@@ -736,16 +766,17 @@ async function startServer() {
             { id: requestId, question, answer, createdAt: new Date().toISOString() },
           ];
           latest.set.chatTurns = updatedTurns;
-          latest.save();
+          await latest.save();
           res.json({ turns: updatedTurns });
-        } catch {
+        } catch (error) {
+          if (error instanceof StoreConflict) throw error;
           res.status(500).json({ error: "Could not save the answer. Please try again." });
         } finally {
           chatsInProgress.delete(set.id);
         }
-      },
+      }),
     )
-    .delete(requireAuth, (req: AuthedRequest, res) => {
+    .delete(requireAuth, route(async (req: AuthedRequest, res) => {
       const chat = openChatSet(req, res);
       if (!chat) return;
       if (chatsInProgress.has(chat.set.id)) {
@@ -754,19 +785,19 @@ async function startServer() {
       }
       if (chat.set.chatTurns?.length) {
         delete chat.set.chatTurns;
-        chat.save();
+        await chat.save();
       }
       res.json({ turns: [] });
-    });
+    }));
 
-  app.post("/api/sets/:id/cards", requireAuth, (req: AuthedRequest, res) => {
+  app.post("/api/sets/:id/cards", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = cardInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid card" });
       return;
     }
 
-    const { data: db, save } = openStudyData(req.userId!);
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const set = db.studySets.find((s) => s.id === req.params.id && s.userId === req.userId);
     if (!set) {
       res.status(404).json({ error: "Study set not found." });
@@ -786,19 +817,19 @@ async function startServer() {
 
     db.cards.push(newCard);
     set.updatedAt = new Date().toISOString();
-    save();
+    await save();
 
     res.status(201).json({ card: newCard });
-  });
+  }));
 
-  app.patch("/api/cards/:id", requireAuth, (req: AuthedRequest, res) => {
+  app.patch("/api/cards/:id", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = cardInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid card" });
       return;
     }
 
-    const { data: db, save } = openStudyData(req.userId!);
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const card = db.cards.find((c) => c.id === req.params.id);
     if (!card) {
       res.status(404).json({ error: "Card not found." });
@@ -814,13 +845,13 @@ async function startServer() {
     card.term = cleanPlainText(parsed.data.term);
     card.definition = cleanPlainText(parsed.data.definition);
     parentSet.updatedAt = new Date().toISOString();
-    save();
+    await save();
 
     res.json({ card });
-  });
+  }));
 
-  app.delete("/api/cards/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db, save } = openStudyData(req.userId!);
+  app.delete("/api/cards/:id", requireAuth, route(async (req: AuthedRequest, res) => {
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const cardIdx = db.cards.findIndex((c) => c.id === req.params.id);
     if (cardIdx === -1) {
       res.status(404).json({ error: "Card not found." });
@@ -836,14 +867,14 @@ async function startServer() {
 
     db.cards.splice(cardIdx, 1);
     parentSet.updatedAt = new Date().toISOString();
-    save();
+    await save();
 
     res.json({ ok: true });
-  });
+  }));
 
   // --- Study Guides ---
   app.get("/api/guides/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db } = openStudyData(req.userId!);
+    const { data: db } = openStudyData(req.userId!, req.db!);
     const guide = db.studyGuides.find(
       (g) => g.id === req.params.id && g.userId === req.userId
     );
@@ -854,14 +885,14 @@ async function startServer() {
     res.json({ guide });
   });
 
-  app.patch("/api/guides/:id", requireAuth, (req: AuthedRequest, res) => {
+  app.patch("/api/guides/:id", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = updateGuideSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid guide fields" });
       return;
     }
 
-    const { data: db, save } = openStudyData(req.userId!);
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const guide = db.studyGuides.find(
       (g) => g.id === req.params.id && g.userId === req.userId
     );
@@ -880,13 +911,13 @@ async function startServer() {
       important_terms: parsed.data.content.important_terms.map((t) => cleanPlainText(t)),
     };
     guide.updatedAt = new Date().toISOString();
-    save();
+    await save();
 
     res.json({ guide });
-  });
+  }));
 
-  app.delete("/api/guides/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db, save } = openStudyData(req.userId!);
+  app.delete("/api/guides/:id", requireAuth, route(async (req: AuthedRequest, res) => {
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const idx = db.studyGuides.findIndex(
       (g) => g.id === req.params.id && g.userId === req.userId
     );
@@ -895,19 +926,19 @@ async function startServer() {
       return;
     }
     db.studyGuides.splice(idx, 1);
-    save();
+    await save();
     res.json({ ok: true });
-  });
+  }));
 
   // --- Quiz Attempts ---
-  app.post("/api/attempts", requireAuth, (req: AuthedRequest, res) => {
+  app.post("/api/attempts", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = quizAttemptInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid quiz attempt payload" });
       return;
     }
 
-    const { data: db, save } = openStudyData(req.userId!);
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const set = db.studySets.find(
       (s) => s.id === parsed.data.setId && s.userId === req.userId
     );
@@ -928,12 +959,13 @@ async function startServer() {
 
     db.quizAttempts.push(attempt);
     set.updatedAt = new Date().toISOString();
-    save();
+    await save();
 
     res.status(201).json({ attempt });
-  });
+  }));
 
   // --- AI Generation ---
+  const uploadRateLimit = rateLimit("upload", 4, "Too many file uploads. Wait a minute and try again.", (req: AuthedRequest) => req.userId!);
   app.post(
     "/api/generate",
     requireAuth,
@@ -941,7 +973,7 @@ async function startServer() {
     (req: AuthedRequest, res: Response, next: NextFunction) => {
       const contentType = req.headers["content-type"] ?? "";
       if (contentType.includes("multipart/form-data")) {
-        upload.array("files", 2)(req, res, (err: unknown) => {
+        uploadRateLimit(req, res, () => upload.array("files", 2)(req, res, (err: unknown) => {
           if (err) {
             const msg =
               err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
@@ -953,15 +985,14 @@ async function startServer() {
             return;
           }
           next();
-        });
+        }));
         return;
       }
       next();
     },
-    async (req: AuthedRequest, res: Response) => {
+    route(async (req: AuthedRequest, res) => {
       const userId = req.userId!;
-      const { data: db, save } = openStudyData(req.userId!);
-      if (countGenerationsToday(db, userId) >= DAILY_CAP) {
+      if (countGenerationsToday(req.db!, userId) >= DAILY_CAP) {
         res.status(429).json({
           error: `Daily limit reached (${DAILY_CAP} AI generations per day). Create manual sets anytime.`,
         });
@@ -970,6 +1001,7 @@ async function startServer() {
 
       const uploadedFiles = (req.files as Express.Multer.File[] | undefined) ?? [];
       const isFileUpload = uploadedFiles.length > 0;
+      let sourcePayload: ExtractedSourcePayload;
 
       if (isFileUpload) {
         const validation = validateUploadFiles(
@@ -983,6 +1015,23 @@ async function startServer() {
           res.status(400).json({ error: validation.error });
           return;
         }
+        try {
+          sourcePayload = await extractFromUploadedFiles(uploadedFiles);
+        } catch (error) {
+          res.status(400).json({ error: error instanceof UploadContentError ? error.message : "This file is invalid or cannot be read." });
+          return;
+        } finally {
+          for (const file of uploadedFiles) file.buffer.fill(0);
+        }
+        req.db = await readDb();
+        if (verifySessionToken(req.cookies?.[COOKIE_NAME], req.db) !== userId) {
+          res.status(401).json({ error: "Session expired. Please log in again." });
+          return;
+        }
+        if (countGenerationsToday(req.db, userId) >= DAILY_CAP) {
+          res.status(429).json({ error: "Your daily generation limit has been reached." });
+          return;
+        }
       } else {
         const parsedText = pastedTextSchema.safeParse(req.body);
         if (!parsedText.success) {
@@ -991,8 +1040,14 @@ async function startServer() {
           });
           return;
         }
+        sourcePayload = { textParts: [cleanPlainText(parsedText.data.text)], pdfFiles: [] };
       }
 
+      if (!sourcePayload.textParts.some(Boolean) && !sourcePayload.pdfFiles.length) {
+        res.status(400).json({ error: "Could not find readable text in the source." });
+        return;
+      }
+      const { data: db, save } = openStudyData(userId, req.db!);
       const now = new Date().toISOString();
       const jobId = `job-${crypto.randomUUID()}`;
       const job = {
@@ -1010,71 +1065,28 @@ async function startServer() {
       };
 
       db.generationJobs.push(job);
-      save();
-
-      // Copy buffers and clear multer references right after starting async processing
-      const fileInputs = uploadedFiles.map((f) => ({
-        originalname: f.originalname,
-        buffer: Buffer.from(f.buffer),
-      }));
-      const rawPastedText = typeof req.body?.text === "string" ? cleanPlainText(req.body.text) : "";
+      await save();
 
       res.status(202).json({ jobId });
 
       void (async () => {
         try {
-          const sourcePayload = isFileUpload
-            ? await extractFromUploadedFiles(fileInputs)
-            : { textParts: [rawPastedText], pdfFiles: [] };
-
-          // Release file buffers immediately after extraction
-          for (const item of fileInputs) {
-            item.buffer.fill(0);
-          }
-
-          if (sourcePayload.textParts.length === 0 && sourcePayload.pdfFiles.length === 0) {
-            throw new Error("Could not extract readable text from the uploaded file.");
-          }
-
           const studySource = await captureStudySource(sourcePayload);
-          const result = await generateStudyMaterials(sourcePayload, (stepMessage) => {
-            const { data: currentDb, save } = openStudyData(userId);
-            const target = currentDb.generationJobs.find((j) => j.id === jobId);
-            if (target) {
-              target.stepMessage = stepMessage;
-              target.updatedAt = new Date().toISOString();
-              save();
-            }
+          const result = await generateStudyMaterials(sourcePayload, async (stepMessage) => {
+            if (!await updateGenerationJob(userId, jobId, { stepMessage })) throw new Error("Generation was cancelled.");
           });
-
-          const { data: finalDb, save } = openStudyData(userId);
-          const target = finalDb.generationJobs.find((j) => j.id === jobId);
-          if (target) {
-            target.status = "done";
-            target.stepMessage = "Ready to review";
-            target.previewResult = result;
-            target.studySource = studySource;
-            target.updatedAt = new Date().toISOString();
-            save();
-          }
-        } catch (err) {
-          const { data: finalDb, save } = openStudyData(userId);
-          const target = finalDb.generationJobs.find((j) => j.id === jobId);
-          if (target) {
-            target.status = "failed";
-            target.stepMessage = "Failed";
-            target.error =
-              err instanceof Error ? err.message : "Failed to generate study material.";
-            target.updatedAt = new Date().toISOString();
-            save();
-          }
+          await updateGenerationJob(userId, jobId, { status: "done", stepMessage: "Ready to review", previewResult: result, studySource });
+        } catch {
+          await updateGenerationJob(userId, jobId, {
+            status: "failed", stepMessage: "Failed", error: "Could not generate study material. Check your source and try again.",
+          });
         }
-      })();
-    }
+      })().catch(() => console.error("Could not save generation status."));
+    })
   );
 
-  app.get("/api/generate/:id", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db } = openStudyData(req.userId!);
+  app.get("/api/generate/:id", requireAuth, rateLimit("generate-status", 120, "Too many generation status requests.", (req: AuthedRequest) => req.userId!), (req: AuthedRequest, res) => {
+    const { data: db } = openStudyData(req.userId!, req.db!);
     const job = db.generationJobs.find(
       (j) => j.id === req.params.id && j.userId === req.userId
     );
@@ -1086,8 +1098,8 @@ async function startServer() {
     res.json({ job: previewJob });
   });
 
-  app.post("/api/generate/:id/save", requireAuth, (req: AuthedRequest, res) => {
-    const { data: db, save } = openStudyData(req.userId!);
+  app.post("/api/generate/:id/save", requireAuth, rateLimit("generate-save", 10, "Too many generation saves.", (req: AuthedRequest) => req.userId!), route(async (req: AuthedRequest, res) => {
+    const { data: db, save } = openStudyData(req.userId!, req.db!);
     const job = db.generationJobs.find(
       (j) => j.id === req.params.id && j.userId === req.userId
     );
@@ -1163,10 +1175,10 @@ async function startServer() {
     job.resultGuideId = guideId;
     delete job.studySource;
     job.updatedAt = now;
-    save();
+    await save();
 
     res.status(201).json({ setId, guideId });
-  });
+  }));
 
   // --- Vite / Static Frontend ---
   if (process.env.NODE_ENV !== "production") {
@@ -1187,13 +1199,27 @@ async function startServer() {
     });
   }
 
+  app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) { next(error); return; }
+    if (error instanceof StoreConflict) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    const status = (error as { status?: number } | null)?.status;
+    if (status === 400 || status === 413) {
+      res.status(status).json({ error: status === 413 ? "Request is too large." : "Invalid request." });
+      return;
+    }
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  });
+
   const port = 3000;
   app.listen(port, "0.0.0.0", () => {
     console.log(`NoteDeck server running on http://localhost:${port}`);
   });
 }
 
-startServer().catch((err) => {
-  console.error("Server failed to start:", err);
+startServer().catch(() => {
+  console.error("NoteDeck failed to start. Check the server environment and database setup.");
   process.exit(1);
 });

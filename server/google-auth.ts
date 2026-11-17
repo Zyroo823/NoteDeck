@@ -3,8 +3,9 @@ import type { Express, Response } from "express";
 import { CodeChallengeMethod, OAuth2Client, type TokenPayload } from "google-auth-library";
 import { cleanPlainText } from "../src/lib/studyLogic";
 import { TERMS_VERSION } from "../src/lib/legal";
-import { readDb, writeDb, type DatabaseState, type UserRecord } from "./store";
+import { readDb, verifySessionToken, writeDb, type DatabaseState, type UserRecord } from "./store";
 import { rateLimit } from "./rate-limit";
+import { DELETION_COOKIE, DELETION_PROOF_MS, SESSION_COOKIE, hashSession, route } from "./security";
 
 const AUTH_PATH = "/api/auth/google";
 const CALLBACK_PATH = `${AUTH_PATH}/callback`;
@@ -42,6 +43,7 @@ function getGoogleConfig() {
     return null;
   }
   const secure = redirect.protocol === "https:";
+  if (process.env.NODE_ENV === "production" && !secure) return null;
   if (!secure && (redirect.protocol !== "http:" ||
       !["localhost", "127.0.0.1", "[::1]"].includes(redirect.hostname))) {
     return null;
@@ -51,7 +53,7 @@ function getGoogleConfig() {
 
 export function registerGoogleAuth(
   app: Express,
-  setSessionCookie: (res: Response, userId: string, secure: boolean) => void
+  setSessionCookie: (res: Response, user: UserRecord, secure: boolean) => void
 ): void {
   const config = getGoogleConfig();
   const cookieOptions = {
@@ -61,7 +63,7 @@ export function registerGoogleAuth(
     path: AUTH_PATH,
   };
 
-  function startGoogleFlow(res: Response, intent: "login" | "signup"): string | null {
+  function startGoogleFlow(res: Response, intent: "login" | "signup" | "delete", deletion?: { userId: string; sessionHash: string }): string | null {
     if (!config) return null;
 
     const state = crypto.randomBytes(32).toString("base64url");
@@ -71,7 +73,7 @@ export function registerGoogleAuth(
     const termsAcceptedAt = intent === "signup" ? new Date().toISOString() : undefined;
     res.cookie(
       OAUTH_COOKIE,
-      { state, nonce, verifier, intent, termsAcceptedAt, expiresAt: Date.now() + FLOW_DURATION_MS },
+      { state, nonce, verifier, intent, termsAcceptedAt, deletion, expiresAt: Date.now() + FLOW_DURATION_MS },
       { ...cookieOptions, signed: true, maxAge: FLOW_DURATION_MS }
     );
     return config.client.generateAuthUrl({
@@ -103,16 +105,9 @@ export function registerGoogleAuth(
     res.redirect(authorizationUrl);
   });
 
-  app.post(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), (req, res) => {
+  app.post(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), route(async (req, res) => {
     res.set("Cache-Control", "no-store");
-    const origin = req.get("origin");
-    const host = req.get("host");
-    if (!origin || !host || !["http", "https"].some((scheme) => origin === `${scheme}://${host}`)) {
-      res.status(403).json({ error: "Invalid request origin." });
-      return;
-    }
-
-    const intent = req.body?.intent === "signup" ? "signup" : "login";
+    const intent = req.body?.intent === "signup" ? "signup" : req.body?.intent === "delete" ? "delete" : "login";
     if (intent === "signup" && req.body?.acceptTerms !== true) {
       res.status(400).json({ error: "Agree to the Terms of Service before creating an account." });
       return;
@@ -122,13 +117,25 @@ export function registerGoogleAuth(
       return;
     }
 
-    const authorizationUrl = startGoogleFlow(res, intent);
+    let deletion: { userId: string; sessionHash: string } | undefined;
+    if (intent === "delete") {
+      const token = req.cookies?.[SESSION_COOKIE];
+      const db = await readDb();
+      const userId = verifySessionToken(token, db);
+      const linked = userId && db.users.find((user) => user.id === userId)?.googleSubject;
+      if (typeof token !== "string" || !userId || !linked) {
+        res.status(403).json({ error: "Sign in to an account with Google linked first." });
+        return;
+      }
+      deletion = { userId, sessionHash: hashSession(token) };
+    }
+    const authorizationUrl = startGoogleFlow(res, intent, deletion);
     if (!authorizationUrl) {
       res.status(503).json({ error: "Gmail sign-in is not available." });
       return;
     }
     res.json({ authorizationUrl });
-  });
+  }));
 
   app.get(CALLBACK_PATH, rateLimit("google-callback", 25, "Too many Gmail sign-in attempts. Try again shortly."), async (req, res) => {
     res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
@@ -138,17 +145,17 @@ export function registerGoogleAuth(
     if (!config || !flow || typeof flow.state !== "string" || flow.state !== req.query.state ||
         typeof flow.expiresAt !== "number" || Date.now() >= flow.expiresAt ||
         typeof flow.verifier !== "string" || typeof flow.nonce !== "string" ||
-        (flow.intent !== "login" && flow.intent !== "signup") ||
+        (flow.intent !== "login" && flow.intent !== "signup" && flow.intent !== "delete") ||
         (flow.intent === "signup" && typeof flow.termsAcceptedAt !== "string")) {
-      res.redirect("/login?google=expired");
+      res.redirect(flow?.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=expired");
       return;
     }
     if (req.query.error === "access_denied") {
-      res.redirect("/login?google=cancelled");
+      res.redirect(flow.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=cancelled");
       return;
     }
     if (typeof req.query.code !== "string" || !req.query.code) {
-      res.redirect("/login?google=failed");
+      res.redirect(flow.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=failed");
       return;
     }
 
@@ -158,7 +165,7 @@ export function registerGoogleAuth(
         codeVerifier: flow.verifier,
       });
       if (!tokens.id_token) {
-        res.redirect("/login?google=failed");
+        res.redirect(flow.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=failed");
         return;
       }
       const ticket = await config.client.verifyIdToken({
@@ -167,18 +174,34 @@ export function registerGoogleAuth(
       });
       const identity = ticket.getPayload() as (TokenPayload & { nonce?: string }) | undefined;
       if (!identity?.sub || identity.nonce !== flow.nonce) {
-        res.redirect("/login?google=failed");
+        res.redirect(flow.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=failed");
         return;
       }
 
       const email = identity.email?.toLowerCase();
       if (!identity.email_verified || !email || !/@(?:gmail|googlemail)\.com$/.test(email)) {
-        res.redirect("/login?google=gmail-required");
+        res.redirect(flow.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=gmail-required");
         return;
       }
 
-      // Read and write without an await so concurrent callbacks cannot create duplicate users.
-      const db = readDb();
+      const db = await readDb();
+      if (flow.intent === "delete") {
+        const token = req.cookies?.[SESSION_COOKIE];
+        const userId = verifySessionToken(token, db);
+        const user = db.users.find((record) => record.id === userId);
+        if (!user || user.id !== flow.deletion?.userId || typeof token !== "string" ||
+            hashSession(token) !== flow.deletion?.sessionHash || user.googleSubject !== identity.sub) {
+          res.redirect("/settings?confirmGoogle=failed");
+          return;
+        }
+        res.cookie(DELETION_COOKIE, {
+          userId: user.id, sessionHash: hashSession(token), expiresAt: Date.now() + DELETION_PROOF_MS,
+        }, { ...cookieOptions, path: "/api/account", signed: true, maxAge: DELETION_PROOF_MS });
+        res.redirect("/settings?confirmGoogle=ready");
+        return;
+      }
+
+      let changed = false;
       let user = db.users.find((record) => record.googleSubject === identity.sub);
       if (!user) {
         const existing = db.users.find((record) => record.email.toLowerCase() === email);
@@ -192,7 +215,7 @@ export function registerGoogleAuth(
             return;
           }
           existing.googleSubject = identity.sub;
-          writeDb(db);
+          changed = true;
           user = existing;
         } else {
           if (flow.intent !== "signup") {
@@ -210,7 +233,7 @@ export function registerGoogleAuth(
             createdAt: new Date().toISOString(),
           } satisfies UserRecord;
           db.users.push(user);
-          writeDb(db);
+          changed = true;
         }
       }
 
@@ -218,13 +241,12 @@ export function registerGoogleAuth(
         res.redirect("/login?google=suspended");
         return;
       }
-      if (bootstrapVerifiedAdmin(db, user, email, process.env.BOOTSTRAP_ADMIN_EMAIL)) {
-        writeDb(db);
-      }
-      setSessionCookie(res, user.id, config.secure);
+      if (bootstrapVerifiedAdmin(db, user, email, process.env.BOOTSTRAP_ADMIN_EMAIL)) changed = true;
+      if (changed) await writeDb(db);
+      setSessionCookie(res, user, config.secure);
       res.redirect("/");
     } catch {
-      res.redirect("/login?google=failed");
+      res.redirect(flow?.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=failed");
     }
   });
 }

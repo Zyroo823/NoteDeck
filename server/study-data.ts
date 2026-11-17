@@ -1,13 +1,12 @@
-import { readDb, writeDb, type DatabaseState, type FolderRecord } from "./store";
+import { writeDb, type DatabaseState, type FolderRecord } from "./store";
 
 type StudyRows = Pick<DatabaseState, "studySets" | "cards" | "studyGuides" | "quizAttempts" | "generationJobs"> & {
   folders: FolderRecord[];
 };
 
 // Open a fresh scope for each synchronous read/modify/write. Cards inherit ownership from their deck.
-export function openStudyData(userId: string) {
+export function openStudyData(userId: string, allRows: DatabaseState) {
   if (!userId) throw new Error("Study data requires a user.");
-  const allRows = readDb();
   const owns = (row: { userId: string }) => row.userId === userId;
   const ownedSets = allRows.studySets.filter(owns);
   const ownedSetIds = new Set(ownedSets.map((set) => set.id));
@@ -43,7 +42,7 @@ export function openStudyData(userId: string) {
           data.quizAttempts.some((attempt) => !setIds.has(attempt.setId))) {
         throw new Error("Study record is outside the current user's scope.");
       }
-      writeDb({
+      return writeDb({
         ...allRows,
         folders: merge((allRows.folders ?? []).filter((row) => !owns(row)), data.folders),
         studySets: merge(allRows.studySets.filter((row) => !owns(row)), data.studySets),
@@ -51,7 +50,7 @@ export function openStudyData(userId: string) {
         studyGuides: merge(allRows.studyGuides.filter((row) => !owns(row)), data.studyGuides),
         quizAttempts: merge(allRows.quizAttempts.filter((row) => !owns(row)), data.quizAttempts),
         generationJobs: merge(allRows.generationJobs.filter((row) => !owns(row)), data.generationJobs),
-      });
+      }, allRows);
     },
   };
 }

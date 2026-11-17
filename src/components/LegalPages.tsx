@@ -38,14 +38,14 @@ const documents: Record<LegalDocument, { title: string; sections: { heading: str
       {
         heading: "Hosting, storage, and retention",
         paragraphs: [
-          "The preview is hosted on Render and stores account and study records in the app’s JSON data file. The current free hosting setup can lose that file on a restart or redeployment. Keep your own copy of important study materials.",
-          "You can delete your account from Settings; this removes the account and linked study records from NoteDeck’s active data file. The app does not send deletion requests to Google or erase copies held separately by service providers. A general retention period for inactive accounts and provider logs has not been set.",
+          "The preview is hosted on Render. Production stores account and study records in a PostgreSQL database.",
+          "You can delete your account from Settings after confirming your identity. This removes the account and linked study records from NoteDeck’s active data store. NoteDeck does not send deletion requests to Google or erase copies held separately by service providers. A general retention period for inactive accounts and provider logs has not been set.",
         ],
       },
       {
         heading: "Your choices and requests",
         paragraphs: [
-          "You can review and correct your profile and study materials in the app, download a JSON copy of your NoteDeck data from Settings, or delete your account there. These actions cover information in the active NoteDeck data file; they do not control copies held by Google, Render, or other service providers.",
+          "You can review and correct your profile and study materials in the app, download a JSON copy of your NoteDeck data from Settings, or delete your account there. These actions cover information in the active NoteDeck data store. They do not control copies held by Google, Render, or other service providers.",
           "Depending on the law that applies to you, you may also have rights to object, restrict processing, or make a privacy complaint. For requests that cannot be completed in the app, email johnmaraledon823@gmail.com. GitHub Issues are public. Do not post account details, private notes, passwords, or other personal information there.",
         ],
       },
