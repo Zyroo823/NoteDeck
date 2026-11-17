@@ -1,9 +1,42 @@
 import { useState } from "react";
-import { ArrowDown, ArrowRight, Moon, RotateCcw, Sun } from "lucide-react";
+import { ArrowDown, ArrowRight, ChevronDown, Moon, RotateCcw, Sun } from "lucide-react";
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#4547cd] dark:focus-visible:outline-indigo-300";
 const primaryLink = `inline-flex items-center justify-center gap-2 rounded-xl bg-[#494bd2] px-5 py-3 font-bold text-white transition-colors hover:bg-[#3739aa] ${focus}`;
+const sectionHeading = "text-2xl font-extrabold tracking-tight";
+const bodyText = "text-sm leading-relaxed text-slate-600 dark:text-slate-400";
+const footerLink = `inline-flex min-h-11 items-center gap-2 rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`;
 const quizOptions = ["Chloroplasts", "Mitochondria", "Ribosomes"];
+
+const features = [
+  { title: "Generate from your notes", description: "Paste class notes or upload a PDF or PowerPoint. NoteDeck turns the material into a draft set of flashcards and a study guide." },
+  { title: "Ask AI about a set", description: "Ask for an explanation, compare two concepts, or find out what to review first. Answers draw on the material in your set." },
+  { title: "Organize sets in folders", description: "Group your sets by class, topic, or exam so you can find them again when it’s time to study." },
+];
+
+const studySteps = [
+  { title: "Add your notes", description: "Paste your notes or upload your class slides or readings." },
+  { title: "Review the draft", description: "Check the generated cards against your notes and edit them before saving." },
+  { title: "Study your set", description: "Flip through the cards, read your study guide, or take a practice quiz." },
+];
+
+const questions = [
+  { question: "Can I try NoteDeck without an account?", answer: <>Yes. You can flip a sample flashcard, read a sample study guide, and answer a practice question above. Create an account to save your own sets.</> },
+  { question: "What can I upload?", answer: <>Upload up to two PDF or PowerPoint (.pptx) files at a time. Each file can be up to 25 MB and 80 pages or slides. You can also paste text directly.</> },
+  { question: "Can I make flashcards myself?", answer: <>Yes. Create a flashcard set and enter your own terms and definitions.</> },
+  { question: "Can I edit what AI generates?", answer: <>Yes. You can edit the generated flashcards and the study guide summary in the preview before saving.</> },
+  { question: "What does Ask AI use to answer questions?", answer: <>Ask AI uses the source text saved with your generated set and its list of terms. For a set you made manually, it uses your flashcards.</> },
+  {
+    question: "What happens to the notes I submit?",
+    answer: <>When you generate with AI, NoteDeck sends the material you submit to Google Gemini. When you save the set, NoteDeck keeps the extracted text for Ask AI. Read the <a href="/privacy" className={`rounded-sm font-semibold text-indigo-700 underline underline-offset-2 dark:text-indigo-300 ${focus}`}>Privacy Policy</a> for details.</>,
+  },
+];
+
+const contacts = [
+  { label: "johnmaraledon823@gmail.com", icon: "gmail", href: "mailto:johnmaraledon823@gmail.com", external: false },
+  { label: "Facebook", icon: "facebook", href: "https://www.facebook.com/john.mar.aledon.2024", external: true },
+  { label: "GitHub", icon: "github", href: "https://github.com/Zyroo823", external: true },
+];
 
 function FlashcardSample() {
   const [flipped, setFlipped] = useState(false);
@@ -67,6 +100,7 @@ export function LandingPage({ theme, onToggleTheme }: LandingPageProps) {
             NoteDeck
           </a>
           <a href="#study-tools" className={`hidden rounded-md text-sm font-semibold text-slate-600 hover:text-[#3739aa] sm:inline dark:text-slate-300 dark:hover:text-indigo-200 ${focus}`}>Study tools</a>
+          <a href="#features" className={`hidden rounded-md text-sm font-semibold text-slate-600 hover:text-[#3739aa] md:inline dark:text-slate-300 dark:hover:text-indigo-200 ${focus}`}>Features</a>
           <div className="ml-auto flex items-center gap-2 whitespace-nowrap sm:gap-5">
             <button type="button" onClick={onToggleTheme} aria-label={themeAction} title={themeAction}
               className={`grid size-10 shrink-0 place-items-center rounded-lg text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-[#1C2336] ${focus}`}>
@@ -120,17 +154,76 @@ export function LandingPage({ theme, onToggleTheme }: LandingPageProps) {
             </article>
           </div>
         </section>
+
+        <section id="features" aria-labelledby="features-heading" className="scroll-mt-6 border-t border-slate-200 py-10 sm:py-14 dark:border-slate-800">
+          <h2 id="features-heading" className={sectionHeading}>Features</h2>
+          <div className="mt-5 grid gap-5 sm:grid-cols-3 sm:gap-8">
+            {features.map(({ title, description }) => (
+              <article key={title}>
+                <h3 className="font-bold">{title}</h3>
+                <p className={`mt-1.5 ${bodyText}`}>{description}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="study-steps-heading" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-8 dark:border-slate-800 dark:bg-[#141926]">
+          <h2 id="study-steps-heading" className={sectionHeading}>How it works</h2>
+          <ol className="mt-5 grid list-none gap-5 sm:grid-cols-3 sm:gap-6" role="list">
+            {studySteps.map(({ title, description }, index) => (
+              <li key={title} className="flex items-start gap-3">
+                <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-md bg-indigo-50 text-xs font-bold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-200">
+                  {index + 1}
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold">{title}</h3>
+                  <p className={`mt-1 ${bodyText}`}>{description}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section id="faq" aria-labelledby="faq-heading" className="grid gap-4 py-10 sm:py-14 lg:grid-cols-[1fr_2fr] lg:gap-8">
+          <h2 id="faq-heading" className={sectionHeading}>Frequently asked questions</h2>
+          <div className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+            {questions.map(({ question, answer }) => (
+              <details key={question} className="group">
+                <summary className={`flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-sm font-bold hover:text-[#3739aa] dark:hover:text-indigo-200 [&::-webkit-details-marker]:hidden ${focus}`}>
+                  {question}
+                  <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-500 group-open:rotate-180 dark:text-slate-400" />
+                </summary>
+                <p className={`max-w-prose pb-4 pr-6 ${bodyText}`}>{answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-slate-200 dark:border-slate-800">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-6 text-sm sm:px-8">
-          <span className="font-extrabold">NoteDeck</span>
-          <div className="flex flex-wrap items-center gap-4">
-            <a href="/privacy" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Privacy</a>
-            <a href="/terms" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Terms</a>
-            <a href="/cookies" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Cookies</a>
-            <a href="/login" className={`rounded-md font-semibold hover:text-[#3739aa] dark:hover:text-indigo-200 ${focus}`}>Log in</a>
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-6 text-sm sm:px-8 md:flex-row md:items-start md:justify-between">
+          <div>
+            <a href="/" className={footerLink}>NoteDeck</a>
+            <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-4 text-slate-600 dark:text-slate-400">
+              <a href="/privacy" className={footerLink}>Privacy</a>
+              <a href="/terms" className={footerLink}>Terms</a>
+              <a href="/cookies" className={footerLink}>Cookies</a>
+              <a href="/login" className={footerLink}>Log in</a>
+            </nav>
           </div>
+          <section aria-labelledby="contact-heading">
+            <h2 id="contact-heading" className="flex min-h-11 items-center font-bold">Contact</h2>
+            <ul className="flex flex-wrap gap-x-4 text-slate-600 dark:text-slate-400">
+              {contacts.map(({ label, icon, href, external }) => (
+                <li key={icon} className={external ? undefined : "max-sm:w-full"}>
+                  <a href={href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className={footerLink}>
+                    <img src={`/icons/${icon}.svg`} alt="" width="18" height="18" className={`size-4.5 shrink-0 object-contain ${icon === "github" ? "dark:invert" : ""}`} />
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </footer>
     </div>
