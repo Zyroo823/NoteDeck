@@ -119,7 +119,13 @@ export async function initializeStorage(): Promise<void> {
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(connection.hostname);
   // Ignore connection-string SSL flags. Always verify remote server certificates.
   for (const key of ["ssl", "sslmode", "sslrootcert", "sslcert", "sslkey"]) connection.searchParams.delete(key);
-  database = postgres(connection.href, { ssl: local ? false : "verify-full", max: 5, connect_timeout: 10 });
+  let ssl: false | "verify-full" | { ca: Buffer; rejectUnauthorized: true } = local ? false : "verify-full";
+  if (connection.hostname.endsWith(".pooler.supabase.com")) {
+    // Supabase's shared pooler uses its own root CA. Keep hostname verification enabled.
+    const ca = fs.readFileSync(new URL("./supabase-root.crt", import.meta.url));
+    ssl = { ca, rejectUnauthorized: true };
+  }
+  database = postgres(connection.href, { ssl, max: 5, connect_timeout: 10 });
   await database`
     insert into notedeck_private.study_store (id, state)
     values (1, ${database.json(emptyDatabase() as unknown as postgres.JSONValue)})
