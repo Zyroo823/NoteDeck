@@ -9,8 +9,6 @@ const googleSignInMessages = new Map([
   ["cancelled", "Gmail sign-in was cancelled."],
   ["failed", "Could not sign in with Gmail. Please try again."],
   ["gmail-required", "Choose a verified Gmail account to continue."],
-  ["signup-required", "No NoteDeck account is linked to that Google account yet. Select Sign up and agree to the Terms first."],
-  ["terms-required", "Agree to the Terms of Service before creating an account."],
   ["existing", "This NoteDeck account is already linked to a different Google account."],
   ["suspended", "This account has been suspended. Contact an administrator."],
 ]);
@@ -103,18 +101,13 @@ export function AuthScreen({
   }
 
   async function handleGoogleSignIn() {
-    if (mode === "signup" && !acceptTerms) {
-      setErrorMessage("Agree to the Terms of Service before creating an account.");
-      return;
-    }
-
     setErrorMessage("");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intent: mode, acceptTerms }),
+        body: JSON.stringify({ intent: mode }),
       });
       const data = (await res.json()) as { authorizationUrl?: string; error?: string };
       if (!res.ok || !data.authorizationUrl) {
@@ -259,10 +252,14 @@ export function AuthScreen({
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
+          aria-describedby="google-terms-notice"
           className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-700 dark:bg-[#1C2336] dark:text-slate-100 dark:hover:bg-slate-700/60"
         >
-          {mode === "signup" ? "Sign up with Gmail" : "Continue with Gmail Account"}
+          Continue with Gmail
         </button>
+        <p id="google-terms-notice" className="mt-2 text-center text-xs text-slate-600 dark:text-slate-400">
+          By continuing, you agree to the <a href="/terms" className="font-semibold text-[#3739aa] underline dark:text-indigo-300">Terms of Service</a> and <a href="/privacy" className="font-semibold text-[#3739aa] underline dark:text-indigo-300">Privacy Policy</a>.
+        </p>
 
         <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
           {mode === "login" ? "Need an account? " : "Already have an account? "}

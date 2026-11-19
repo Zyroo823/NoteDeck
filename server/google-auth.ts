@@ -70,7 +70,7 @@ export function registerGoogleAuth(
     const nonce = crypto.randomBytes(32).toString("base64url");
     const verifier = crypto.randomBytes(32).toString("base64url");
     const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
-    const termsAcceptedAt = intent === "signup" ? new Date().toISOString() : undefined;
+    const termsAcceptedAt = intent !== "delete" ? new Date().toISOString() : undefined;
     res.cookie(
       OAUTH_COOKIE,
       { state, nonce, verifier, intent, termsAcceptedAt, deletion, expiresAt: Date.now() + FLOW_DURATION_MS },
@@ -88,30 +88,14 @@ export function registerGoogleAuth(
 
   app.get(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), (req, res) => {
     res.set("Cache-Control", "no-store");
-    if (req.query.intent === "signup") {
-      res.redirect("/signup?google=terms-required");
-      return;
-    }
-    if (!config) {
-      res.redirect("/login?google=unavailable");
-      return;
-    }
-
-    const authorizationUrl = startGoogleFlow(res, "login");
-    if (!authorizationUrl) {
-      res.redirect("/login?google=unavailable");
-      return;
-    }
-    res.redirect(authorizationUrl);
+    // Start account-capable flows from the button beside the consent notice.
+    const page = req.query.intent === "signup" ? "/signup" : "/login";
+    res.redirect(config ? page : `${page}?google=unavailable`);
   });
 
   app.post(AUTH_PATH, rateLimit("google-start", 10, "Too many Gmail sign-in attempts. Try again shortly."), route(async (req, res) => {
     res.set("Cache-Control", "no-store");
     const intent = req.body?.intent === "signup" ? "signup" : req.body?.intent === "delete" ? "delete" : "login";
-    if (intent === "signup" && req.body?.acceptTerms !== true) {
-      res.status(400).json({ error: "Agree to the Terms of Service before creating an account." });
-      return;
-    }
     if (!config) {
       res.status(503).json({ error: "Gmail sign-in is not set up yet." });
       return;
@@ -146,7 +130,7 @@ export function registerGoogleAuth(
         typeof flow.expiresAt !== "number" || Date.now() >= flow.expiresAt ||
         typeof flow.verifier !== "string" || typeof flow.nonce !== "string" ||
         (flow.intent !== "login" && flow.intent !== "signup" && flow.intent !== "delete") ||
-        (flow.intent === "signup" && typeof flow.termsAcceptedAt !== "string")) {
+        (flow.intent !== "delete" && typeof flow.termsAcceptedAt !== "string")) {
       res.redirect(flow?.intent === "delete" ? "/settings?confirmGoogle=failed" : "/login?google=expired");
       return;
     }
@@ -218,17 +202,13 @@ export function registerGoogleAuth(
           changed = true;
           user = existing;
         } else {
-          if (flow.intent !== "signup") {
-            res.redirect("/login?google=signup-required");
-            return;
-          }
           const name = cleanPlainText(identity.name ?? "").slice(0, 60);
           user = {
             id: `user-${crypto.randomUUID()}`,
             name: name || email.split("@")[0],
             email,
             googleSubject: identity.sub,
-            termsAcceptedAt: flow.termsAcceptedAt as string,
+            termsAcceptedAt: flow.termsAcceptedAt,
             termsVersion: TERMS_VERSION,
             createdAt: new Date().toISOString(),
           } satisfies UserRecord;

@@ -58,7 +58,7 @@ The server loads `.env` automatically. The API key is needed for generation; sto
 3. In `.env`, set `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `SESSION_SECRET`. Generate a session secret with `node -p "require('node:crypto').randomBytes(32).toString('hex')"`. Changing the session secret signs users out.
 4. Restart the app and open it at `http://localhost:3000`. For another origin, set `GOOGLE_OAUTH_REDIRECT_URI` to the full callback URL and register that exact URI in Google Cloud. Use HTTPS for a non-loopback origin.
 
-The first successful Gmail sign-in creates a NoteDeck account, or links the verified Gmail address to an existing account with the same email. Existing password sign-in remains available.
+**Continue with Gmail** on `/login` and `/signup` signs in to a linked NoteDeck account, links a verified Gmail address to an existing account with the same email, or creates an account when there is no match. The notice beside the button links to the Terms of Service and Privacy Policy. For new Gmail accounts, NoteDeck records when the flow began and the current Terms version. Password signup requires its own Terms checkbox.
 
 ### Rate limits and account access
 

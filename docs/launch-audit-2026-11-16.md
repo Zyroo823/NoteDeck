@@ -53,7 +53,7 @@ The app currently has no paid plan, marketing-email subscription, public review/
 - Added public `/privacy` and `/terms` pages and navigation links from the landing page, auth screen, and app shell. The pages identify the operator and provide a private email for account/privacy requests; they warn users not to post secrets or personal notes in public GitHub Issues.
 - Added a custom 404 page and production HTTP 404 handling for unknown page/API routes. Legal and unknown routes render without waiting for the auth request.
 - Added `/cookies` with the current essential-cookie inventory; no non-essential cookie banner is shown because the app does not currently set advertising or analytics cookies.
-- Required Terms acceptance for password signup and new Google signups, recording the accepted version and timestamp. Existing accounts are not forced to reaccept.
+- Required Terms acceptance for new accounts, recording the accepted version and timestamp. Password signup uses a checkbox. **Continue with Gmail** on either auth screen uses the notice beside the button and records the flow start time for new accounts. Existing accounts are not forced to reaccept.
 - Added account data export and self-service account deletion, plus Cookie Policy and skip-to-content links. Contrast improvements darken default muted text and solid primary buttons.
 - Moved five unused screenshots out of `public/` until source/distribution rights are confirmed.
 
