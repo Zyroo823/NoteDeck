@@ -80,13 +80,12 @@
 }
 
 /* Jakob: place chat in the expected corner. Fitts: 56px target, 16px edge gap.
-   The reserved rail/dock keeps page actions clear. App overlays use z-50 or the top layer. */
+   The desktop rail and mobile navigation dock keep page actions clear. */
 .assistant-frame {
   --mobile-nav-content-height: 4.5rem;
   --assistant-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   --assistant-right: calc(1rem + env(safe-area-inset-right, 0px));
   --assistant-lift: 0px;
-  --assistant-dock: calc(4rem + var(--assistant-bottom) + var(--assistant-lift));
   min-height: 100dvh;
 }
 
@@ -94,16 +93,7 @@ html:has(.assistant-frame) {
   scrollbar-gutter: auto;
 }
 
-.assistant-page {
-  height: calc(100dvh - var(--assistant-dock));
-  overflow: auto;
-  scroll-padding-top: 5rem;
-  border-bottom: 1px solid var(--color-slate-200);
-}
-
-.dark .assistant-page { border-color: var(--color-slate-800); }
-
-.assistant-page > :where(.min-h-screen, .min-h-dvh) { min-height: 100%; }
+.assistant-page > :where(.min-h-screen, .min-h-dvh) { min-height: 100dvh; }
 
 .assistant-launcher {
   position: fixed;
@@ -127,8 +117,19 @@ html:has(.assistant-frame) {
 .assistant-compose { padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px)); }
 
 @media (width < 48rem) {
-  .assistant-frame:has(.mobile-navigation-dock) {
-    --assistant-dock: calc(var(--mobile-nav-content-height) + 1px + env(safe-area-inset-bottom, 0px));
+  .assistant-frame:has(.mobile-navigation-dock) > .assistant-page {
+    height: calc(100dvh - var(--mobile-nav-content-height) - 1px - env(safe-area-inset-bottom, 0px));
+    overflow: auto;
+    scroll-padding-top: 5rem;
+  }
+
+  .assistant-frame:has(.mobile-navigation-dock) > .assistant-page > :where(.min-h-screen, .min-h-dvh) {
+    min-height: 100%;
+  }
+
+  /* Reserve room after the last public page action as part of the scrollable content. */
+  .assistant-frame:not(:has(.mobile-navigation-dock)) > .assistant-page {
+    padding-bottom: calc(3.5rem + var(--assistant-bottom) + var(--assistant-lift));
   }
 
   .assistant-frame:has(.mobile-navigation-dock) > .assistant-launcher { display: none; }
@@ -136,13 +137,8 @@ html:has(.assistant-frame) {
 
 @media (min-width: 48rem) {
   .assistant-page {
-    height: auto;
-    overflow: visible;
     padding-inline-end: calc(4rem + var(--assistant-right));
-    border-bottom: 0;
   }
-
-  .assistant-page > :where(.min-h-screen, .min-h-dvh) { min-height: 100dvh; }
 
   .assistant-dialog {
     inset: auto var(--assistant-right) calc(var(--assistant-bottom) + var(--assistant-lift)) auto;
