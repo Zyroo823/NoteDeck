@@ -158,6 +158,11 @@ async function startServer() {
   app.use(cookieParser(process.env.SESSION_SECRET));
   app.use(express.json({ limit: "2mb" }));
 
+  app.get("/.well-known/assetlinks.json", (_req, res) => {
+    const assetsDirectory = process.env.NODE_ENV === "production" ? "dist" : "public";
+    res.sendFile("assetlinks.json", { root: path.resolve(assetsDirectory, ".well-known") });
+  });
+
   const assistantRequests = new Set<string>();
   app.post("/api/assistant", requireAuth,
     rateLimit("assistant", 8, "Too many assistant messages. Try again in a minute.", (req: AuthedRequest) => req.userId!),

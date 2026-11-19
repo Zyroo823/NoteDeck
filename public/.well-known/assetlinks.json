@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zyroo823.notedeck",
+      "sha256_cert_fingerprints": ["A6:E5:ED:12:84:E9:FA:E8:B3:98:E4:D5:E4:9E:E2:A7:0B:D2:52:44:DA:B2:B6:75:2C:ED:F5:FE:F3:92:BC:20"]
+    }
+  }
+]

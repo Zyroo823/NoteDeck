@@ -1,0 +1,13 @@
+{
+  "id": "/",
+  "name": "NoteDeck",
+  "short_name": "NoteDeck",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0E17",
+  "theme_color": "#0B0E17",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ]
+}
