@@ -42,6 +42,15 @@ export interface FolderRecord {
   name: string;
 }
 
+export interface StudyGroupRecord {
+  id: string;
+  name: string;
+  ownerId: string;
+  memberIds: string[];
+  inviteCode: string;
+  createdAt: string;
+}
+
 export interface CardRecord {
   id: string;
   setId: string;
@@ -71,6 +80,7 @@ export interface QuizAttemptRecord {
   score: number;
   total: number;
   createdAt: string;
+  notificationRead?: boolean;
 }
 
 export interface GenerationJobRecord {
@@ -86,11 +96,13 @@ export interface GenerationJobRecord {
   error: string | null;
   createdAt: string;
   updatedAt: string;
+  notificationRead?: boolean;
 }
 
 export interface DatabaseState {
   users: UserRecord[];
   folders?: FolderRecord[];
+  studyGroups?: StudyGroupRecord[];
   studySets: StudySetRecord[];
   cards: CardRecord[];
   studyGuides: StudyGuideRecord[];

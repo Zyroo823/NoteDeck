@@ -21,10 +21,10 @@ const markdown = new Marked({
   },
 });
 
-export function StudyChatMarkdown({ text }: { text: string }) {
+export function StudyChatMarkdown({ text, allowLinks = true }: { text: string; allowLinks?: boolean }) {
   const html = DOMPurify.sanitize(markdown.parse(text, { async: false }), {
-    ALLOWED_TAGS: ["p", "strong", "em", "ul", "ol", "li", "br", "code", "a"],
-    ALLOWED_ATTR: ["href", "target", "rel", "start"],
+    ALLOWED_TAGS: ["p", "strong", "em", "ul", "ol", "li", "br", "code", ...(allowLinks ? ["a"] : [])],
+    ALLOWED_ATTR: allowLinks ? ["href", "target", "rel", "start"] : ["start"],
     ALLOW_ARIA_ATTR: false,
     ALLOW_DATA_ATTR: false,
   });

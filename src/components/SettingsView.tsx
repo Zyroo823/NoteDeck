@@ -199,7 +199,7 @@ export function SettingsView({
         <div className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-800">
           <h3 className="font-semibold text-red-700 dark:text-red-300">Delete account</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            This permanently removes your account and study data from NoteDeck. Confirm your identity before deleting your account.
+            This permanently removes your account, study data, and any study groups you own. Confirm your identity before deleting your account.
           </p>
           {deleteError ? (
             <div role="alert" className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">

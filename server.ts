@@ -11,12 +11,15 @@ import {
   folderItemInputSchema,
   folderNameSchema,
   loginSchema,
+  markNotificationsReadSchema,
   pastedTextSchema,
   profileUpdateSchema,
   quizAttemptInputSchema,
   saveGeneratedResultSchema,
   signupSchema,
   studyChatInputSchema,
+  studyGroupInviteSchema,
+  studyGroupNameSchema,
   studySetInputSchema,
   updateGuideSchema,
 } from "./src/lib/schemas";
@@ -35,14 +38,19 @@ import {
   verifySessionToken,
   writeDb,
   type StudySetRecord,
+  type StudyGroupRecord,
   type UserRecord,
 } from "./server/store";
 import { extractFromUploadedFiles, UploadContentError, type ExtractedSourcePayload } from "./server/extract";
-import { answerStudyQuestion, captureStudySource, generateStudyMaterials, isGeminiUnavailable } from "./server/ai";
+import { answerAssistantQuestion, answerStudyQuestion, captureStudySource, generateStudyMaterials, isGeminiUnavailable } from "./server/ai";
+import { buildAssistantContext } from "./server/assistant-context";
+import { getNotificationInbox, markNotificationsRead } from "./server/notifications";
+import { assistantRequestSchema } from "./src/chatbot/assistant";
 import { registerGoogleAuth } from "./server/google-auth";
 import { rateLimit } from "./server/rate-limit";
 import { DELETION_COOKIE, SESSION_COOKIE, hasDeletionProof, requireSameOrigin, route, setSecurityHeaders } from "./server/security";
 import { openStudyData } from "./server/study-data";
+import { MAX_GROUPS_PER_MEMBER, MAX_STUDY_GROUP_MEMBERS, newStudyGroupInviteCode, removeUserFromStudyGroups, studyGroupDetail, studyGroupsForUser, summarizeStudyGroup } from "./server/study-groups";
 import { TERMS_VERSION } from "./src/lib/legal";
 
 const COOKIE_NAME = SESSION_COOKIE;
@@ -149,6 +157,45 @@ async function startServer() {
   const chatsInProgress = new Set<string>();
   app.use(cookieParser(process.env.SESSION_SECRET));
   app.use(express.json({ limit: "2mb" }));
+
+  const assistantRequests = new Set<string>();
+  app.post("/api/assistant", requireAuth,
+    rateLimit("assistant", 8, "Too many assistant messages. Try again in a minute.", (req: AuthedRequest) => req.userId!),
+    route(async (req: AuthedRequest, res) => {
+      res.set("Cache-Control", "private, no-store");
+      const parsed = assistantRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Send a message of 1,000 characters or fewer." });
+        return;
+      }
+      const { question, material, history } = parsed.data;
+      const userId = req.userId!;
+      const context = material ? buildAssistantContext(req.db!, userId, material) : null;
+      if (material && context === null) {
+        res.status(404).json({ error: "This study material is unavailable. Open a set or guide from your Library." });
+        return;
+      }
+      if (assistantRequests.has(userId)) {
+        res.status(429).json({ error: "The assistant is already answering a message. Try again shortly." });
+        return;
+      }
+      assistantRequests.add(userId);
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      res.once("close", abort);
+      try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]);
+        const answer = await answerAssistantQuestion(question, context, history, signal);
+        if (!controller.signal.aborted) res.json({ answer });
+      } catch {
+        if (!controller.signal.aborted) {
+          res.status(503).json({ error: "The assistant couldn’t respond right now. Try again in a moment." });
+        }
+      } finally {
+        res.off("close", abort);
+        assistantRequests.delete(userId);
+      }
+    }));
 
   // --- Auth Routes ---
   app.post("/api/auth/signup", rateLimit("signup", 10, "Too many signup attempts. Wait a minute and try again."), route(async (req: AuthedRequest, res) => {
@@ -270,14 +317,15 @@ async function startServer() {
         createdAt: user.createdAt,
       },
       folders: (db.folders ?? []).filter((record) => record.userId === user.id),
+      studyGroups: studyGroupsForUser(db, user.id).map(({ id, name, ownerId, createdAt }) => ({ id, name, isOwner: ownerId === user.id, createdAt })),
       studySets,
       cards: db.cards.filter((record) => setIds.has(record.setId)),
       studyGuides: db.studyGuides.filter((record) => record.userId === user.id),
       quizAttempts: db.quizAttempts.filter((record) => record.userId === user.id),
       generationJobs: db.generationJobs
         .filter((record) => record.userId === user.id)
-        .map(({ id, status, sourceKind, previewResult, studySource, resultSetId, resultGuideId, createdAt, updatedAt }) =>
-          ({ id, status, sourceKind, previewResult, studySource, resultSetId, resultGuideId, createdAt, updatedAt })),
+        .map(({ id, status, sourceKind, previewResult, studySource, resultSetId, resultGuideId, createdAt, updatedAt, notificationRead }) =>
+          ({ id, status, sourceKind, previewResult, studySource, resultSetId, resultGuideId, createdAt, updatedAt, notificationRead })),
     };
 
     res.set({
@@ -318,6 +366,7 @@ async function startServer() {
 
     const setIds = new Set(db.studySets.filter((record) => record.userId === user.id).map((record) => record.id));
     db.users = db.users.filter((record) => record.id !== user.id);
+    removeUserFromStudyGroups(db, user.id);
     db.folders = (db.folders ?? []).filter((record) => record.userId !== user.id);
     db.studySets = db.studySets.filter((record) => record.userId !== user.id);
     db.cards = db.cards.filter((record) => !setIds.has(record.setId));
@@ -557,6 +606,124 @@ async function startServer() {
     data.folders.splice(index, 1);
     await save();
     res.json({ ok: true });
+  }));
+
+  // --- Study Groups ---
+  const studyGroupWriteLimit = rateLimit("study-group-write", 20, "Too many group changes. Try again in a minute.", (req: AuthedRequest) => req.userId!);
+  const studyGroupsPath = "/api/study-groups";
+
+  app.use(studyGroupsPath, requireAuth, (_req, res, next) => {
+    res.set("Cache-Control", "private, no-store");
+    next();
+  });
+
+  function findMemberGroup(req: AuthedRequest) {
+    return studyGroupsForUser(req.db!, req.userId!).find(({ id }) => id === req.params.id);
+  }
+
+  app.get(studyGroupsPath, (req: AuthedRequest, res) => {
+    const groups = studyGroupsForUser(req.db!, req.userId!).map((group) => summarizeStudyGroup(group, req.userId!));
+    res.json({ groups });
+  });
+
+  app.post(studyGroupsPath, studyGroupWriteLimit, route(async (req: AuthedRequest, res) => {
+    const parsed = studyGroupNameSchema.safeParse({ name: typeof req.body?.name === "string" ? cleanPlainText(req.body.name) : undefined });
+    if (!parsed.success) {
+      res.status(400).json({ error: "Enter a group name with 2 to 60 characters." });
+      return;
+    }
+    const db = req.db!;
+    const userId = req.userId!;
+    if (studyGroupsForUser(db, userId).length >= MAX_GROUPS_PER_MEMBER) {
+      res.status(409).json({ error: `You can belong to up to ${MAX_GROUPS_PER_MEMBER} study groups.` });
+      return;
+    }
+    const group: StudyGroupRecord = {
+      id: `group-${crypto.randomUUID()}`,
+      name: parsed.data.name,
+      ownerId: userId,
+      memberIds: [userId],
+      inviteCode: newStudyGroupInviteCode(db),
+      createdAt: new Date().toISOString(),
+    };
+    (db.studyGroups ??= []).unshift(group);
+    await writeDb(db);
+    res.status(201).json({ groupId: group.id });
+  }));
+
+  app.post(`${studyGroupsPath}/join`, studyGroupWriteLimit, route(async (req: AuthedRequest, res) => {
+    const parsed = studyGroupInviteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Enter the 16-character invite code." });
+      return;
+    }
+    const db = req.db!;
+    const userId = req.userId!;
+    const group = db.studyGroups?.find(({ inviteCode }) => inviteCode === parsed.data.code);
+    if (!group) {
+      res.status(404).json({ error: "This invite code is invalid. Ask the group owner for the current code." });
+      return;
+    }
+    if (!group.memberIds.includes(userId)) {
+      if (studyGroupsForUser(db, userId).length >= MAX_GROUPS_PER_MEMBER) {
+        res.status(409).json({ error: `You can belong to up to ${MAX_GROUPS_PER_MEMBER} study groups.` });
+        return;
+      }
+      if (group.memberIds.length >= MAX_STUDY_GROUP_MEMBERS) {
+        res.status(409).json({ error: "This study group is full." });
+        return;
+      }
+      group.memberIds.push(userId);
+      await writeDb(db);
+    }
+    res.json({ groupId: group.id });
+  }));
+
+  app.get(`${studyGroupsPath}/:id`, (req: AuthedRequest, res) => {
+    const group = findMemberGroup(req);
+    if (!group) {
+      res.status(404).json({ error: "Study group not found." });
+      return;
+    }
+    res.json({ group: studyGroupDetail(req.db!, group, req.userId!) });
+  });
+
+  app.post(`${studyGroupsPath}/:id/invite-code`, studyGroupWriteLimit, route(async (req: AuthedRequest, res) => {
+    const group = findMemberGroup(req);
+    if (!group || group.ownerId !== req.userId) {
+      res.status(404).json({ error: "Study group not found or you are not its owner." });
+      return;
+    }
+    group.inviteCode = newStudyGroupInviteCode(req.db!);
+    await writeDb(req.db!);
+    res.json({ group: studyGroupDetail(req.db!, group, req.userId!) });
+  }));
+
+  app.delete(`${studyGroupsPath}/:id/membership`, studyGroupWriteLimit, route(async (req: AuthedRequest, res) => {
+    const group = findMemberGroup(req);
+    if (!group) {
+      res.status(404).json({ error: "Study group not found." });
+      return;
+    }
+    if (group.ownerId === req.userId) {
+      res.status(409).json({ error: "Owners can delete their group from group settings." });
+      return;
+    }
+    group.memberIds = group.memberIds.filter((id) => id !== req.userId);
+    await writeDb(req.db!);
+    res.status(204).end();
+  }));
+
+  app.delete(`${studyGroupsPath}/:id`, studyGroupWriteLimit, route(async (req: AuthedRequest, res) => {
+    const group = findMemberGroup(req);
+    if (!group || group.ownerId !== req.userId) {
+      res.status(404).json({ error: "Study group not found or you are not its owner." });
+      return;
+    }
+    const db = req.db!;
+    db.studyGroups = db.studyGroups?.filter(({ id }) => id !== group.id);
+    await writeDb(db);
+    res.status(204).end();
   }));
 
   // --- Study Sets & Cards ---
@@ -930,6 +1097,24 @@ async function startServer() {
     res.json({ ok: true });
   }));
 
+  app.get("/api/notifications", requireAuth, (req: AuthedRequest, res) => {
+    res.set("Cache-Control", "private, no-store");
+    res.json(getNotificationInbox(req.db!, req.userId!));
+  });
+
+  app.patch("/api/notifications/read", requireAuth, route(async (req: AuthedRequest, res) => {
+    res.set("Cache-Control", "private, no-store");
+    const parsed = markNotificationsReadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Select notifications to mark as read." });
+      return;
+    }
+    const db = req.db!;
+    const userId = req.userId!;
+    if (markNotificationsRead(db, userId, parsed.data.ids)) await writeDb(db);
+    res.json(getNotificationInbox(db, userId));
+  }));
+
   // --- Quiz Attempts ---
   app.post("/api/attempts", requireAuth, route(async (req: AuthedRequest, res) => {
     const parsed = quizAttemptInputSchema.safeParse(req.body);
@@ -1197,7 +1382,7 @@ async function startServer() {
       res.status(404).json({ error: "API route not found." });
     });
     app.get("*", (_req, res) => {
-      const knownPage = /^\/(?:$|login\/?$|signup\/?$|privacy\/?$|terms\/?$|cookies\/?$|library\/?$|practice-test\/?$|settings\/?$|admin\/?$|sets\/new\/?$|sets\/[^/]+(?:\/edit)?\/?$|guides\/[^/]+\/?$|folders\/[^/]+\/?$)/.test(_req.path);
+      const knownPage = /^\/(?:$|login\/?$|signup\/?$|privacy\/?$|terms\/?$|cookies\/?$|library\/?$|practice-test\/?$|settings\/?$|help\/?$|notifications\/?$|admin\/?$|study-groups(?:\/[^/]+)?\/?$|sets\/new\/?$|sets\/[^/]+(?:\/edit)?\/?$|guides\/[^/]+\/?$|folders\/[^/]+\/?$)/.test(_req.path);
       res.status(knownPage ? 200 : 404).sendFile(path.join(distDir, "index.html"));
     });
   }

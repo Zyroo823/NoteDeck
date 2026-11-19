@@ -1,23 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { FileText, Layers, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/src/components/ConfirmDialog";
+import { PracticeTestView } from "@/src/components/PracticeTestView";
 import type { LibraryGuideSummary, LibrarySetSummary } from "@/src/types/api";
+
+const libraryTabs = [
+  { value: "all", label: "All" },
+  { value: "sets", label: "Flashcards" },
+  { value: "guides", label: "Study guides" },
+  { value: "practice", label: "Practice Test" },
+  { value: "activities", label: "Activities" },
+] as const;
+
+type LibraryTab = typeof libraryTabs[number]["value"];
 
 interface LibraryViewProps {
   initialQuery: string;
-  initialTab: "all" | "sets" | "guides";
+  activeTab: LibraryTab;
   onNavigate: (path: string) => void;
   onOpenGenerate: () => void;
 }
 
 export function LibraryView({
   initialQuery,
-  initialTab,
+  activeTab,
   onNavigate,
   onOpenGenerate,
 }: LibraryViewProps) {
   const [query, setQuery] = useState(initialQuery);
-  const [activeTab, setActiveTab] = useState<"all" | "sets" | "guides">(initialTab);
+  const browseLibrary = activeTab !== "practice" && activeTab !== "activities";
   const [sets, setSets] = useState<LibrarySetSummary[]>([]);
   const [guides, setGuides] = useState<LibraryGuideSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,10 +45,7 @@ export function LibraryView({
   }, [initialQuery]);
 
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
-
-  useEffect(() => {
+    if (!browseLibrary) return;
     let active = true;
     async function loadLibrary() {
       setLoading(true);
@@ -70,7 +78,28 @@ export function LibraryView({
     return () => {
       active = false;
     };
-  }, [query]);
+  }, [browseLibrary, query]);
+
+  function selectTab(tab: LibraryTab) {
+    if (tab === activeTab) return;
+    const params = new URLSearchParams();
+    if (tab !== "all" && tab !== "practice") params.set("type", tab);
+    if (query.trim()) params.set("q", query.trim());
+    const path = tab === "practice" ? "/practice-test" : "/library";
+    onNavigate(params.size ? `${path}?${params}` : path);
+  }
+
+  function moveTabFocus(event: KeyboardEvent<HTMLDivElement>) {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]"));
+    const index = tabs.findIndex((tab) => tab === event.target);
+    if (index === -1) return;
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+      : (index + (event.key === "ArrowLeft" ? -1 : 1) + tabs.length) % tabs.length;
+    event.preventDefault();
+    tabs[next]?.focus();
+  }
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
@@ -104,6 +133,7 @@ export function LibraryView({
   const visibleSets = showSets ? sets : [];
   const visibleGuides = showGuides ? guides : [];
   const isEmpty = !loading && visibleSets.length === 0 && visibleGuides.length === 0;
+  const panel = { role: "tabpanel", id: "library-panel", "aria-labelledby": `library-tab-${activeTab}`, tabIndex: 0 } as const;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -136,54 +166,25 @@ export function LibraryView({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div
-          className="inline-flex rounded-xl bg-slate-200/70 p-1 dark:bg-[#141926]"
-          role="tablist"
-          aria-label="Library category filter"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "all"}
-            onClick={() => setActiveTab("all")}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition ${
-              activeTab === "all"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-[#1C2336] dark:text-white"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-            }`}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "sets"}
-            onClick={() => setActiveTab("sets")}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition ${
-              activeTab === "sets"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-[#1C2336] dark:text-white"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-            }`}
-          >
-            Flashcards
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "guides"}
-            onClick={() => setActiveTab("guides")}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition ${
-              activeTab === "guides"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-[#1C2336] dark:text-white"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-            }`}
-          >
-            Study guides
-          </button>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex max-w-full flex-wrap items-center self-start rounded-xl bg-slate-200/70 p-1 dark:bg-[#141926]">
+          <div role="tablist" aria-label="Library sections" onKeyDown={moveTabFocus} className="flex max-w-full flex-wrap">
+            {libraryTabs.map(({ value, label }) => (
+              <button key={value} id={`library-tab-${value}`} type="button" role="tab" aria-selected={activeTab === value}
+                aria-controls="library-panel" tabIndex={activeTab === value ? 0 : -1} onClick={() => selectTab(value)}
+                className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition ${
+                  activeTab === value
+                    ? "bg-white text-slate-900 shadow-sm dark:bg-[#1C2336] dark:text-white"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}>
+                {label}
+                {value === "activities" && <span className="rounded-md bg-slate-300/50 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-[#0B0E17] dark:text-slate-300">Soon</span>}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="relative w-full sm:w-64">
+        {browseLibrary && <div className="relative w-full shrink-0 sm:w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
@@ -193,10 +194,17 @@ export function LibraryView({
             placeholder="Filter by title..."
             className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] dark:border-slate-800 dark:bg-[#141926] dark:text-slate-100"
           />
-        </div>
+        </div>}
       </div>
 
-      {errorMessage ? (
+      {activeTab === "practice" && <div {...panel}><PracticeTestView onNavigate={onNavigate} /></div>}
+      {activeTab === "activities" && (
+        <section {...panel} className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 dark:border-slate-800 dark:bg-[#141926]">
+          <h2 className="text-lg font-semibold">Activities are coming soon</h2>
+        </section>
+      )}
+
+      {browseLibrary && errorMessage ? (
         <div
           role="alert"
           className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
@@ -205,15 +213,15 @@ export function LibraryView({
         </div>
       ) : null}
 
-      {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2">
+      {browseLibrary && (loading ? (
+        <div {...panel} className="grid gap-4 sm:grid-cols-2">
           <div className="h-28 animate-pulse rounded-2xl bg-slate-200 dark:bg-[#141926]" />
           <div className="h-28 animate-pulse rounded-2xl bg-slate-200 dark:bg-[#141926]" />
           <div className="h-28 animate-pulse rounded-2xl bg-slate-200 dark:bg-[#141926]" />
           <div className="h-28 animate-pulse rounded-2xl bg-slate-200 dark:bg-[#141926]" />
         </div>
       ) : isEmpty ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-[#141926]">
+        <div {...panel} className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-[#141926]">
           <Layers className="mx-auto h-8 w-8 text-slate-500" />
           <h2 className="mt-3 text-lg font-semibold">No matching items found</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -233,7 +241,7 @@ export function LibraryView({
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div {...panel} className="space-y-8">
           {visibleSets.length > 0 ? (
             <section className="space-y-3">
               <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400">
@@ -330,7 +338,7 @@ export function LibraryView({
             </section>
           ) : null}
         </div>
-      )}
+      ))}
 
       <ConfirmDialog
         open={deleteTarget !== null}

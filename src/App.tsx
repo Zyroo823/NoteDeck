@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { AuthScreen } from "@/src/components/AuthScreen";
 import { AppShell } from "@/src/components/AppShell";
@@ -12,8 +12,12 @@ import { SettingsView } from "@/src/components/SettingsView";
 import { AdminView } from "@/src/components/AdminView";
 import { GenerateModal } from "@/src/components/GenerateModal";
 import { FolderView } from "@/src/components/FolderView";
-import { PracticeTestView } from "@/src/components/PracticeTestView";
 import { LegalPage, NotFoundPage } from "@/src/components/LegalPages";
+import { HelpView } from "@/src/components/HelpView";
+import { NotificationsView } from "@/src/components/NotificationsView";
+import { StudyGroupsView, StudyGroupView } from "@/src/components/StudyGroupsView";
+import { useNotifications } from "@/src/lib/useNotifications";
+import { AssistantFrame } from "@/src/components/FloatingAssistant";
 import type { AuthUser, FolderSummary } from "@/src/types/api";
 
 function getInitialTheme(): "dark" | "light" {
@@ -27,8 +31,8 @@ function readCurrentUrlPath(): string {
 }
 
 function isKnownPath(pathname: string): boolean {
-  return ["/", "/login", "/signup", "/privacy", "/terms", "/cookies", "/library", "/practice-test", "/settings", "/admin", "/sets/new"].includes(pathname) ||
-    /^\/(?:sets\/[^/]+(?:\/edit)?|guides\/[^/]+|folders\/[^/]+)$/.test(pathname);
+  return ["/", "/login", "/signup", "/privacy", "/terms", "/cookies", "/library", "/practice-test", "/settings", "/help", "/notifications", "/admin", "/sets/new", "/study-groups"].includes(pathname) ||
+    /^\/(?:sets\/[^/]+(?:\/edit)?|guides\/[^/]+|folders\/[^/]+|study-groups\/[^/]+)$/.test(pathname);
 }
 
 export default function App() {
@@ -46,12 +50,16 @@ export default function App() {
     failed?: boolean;
   } | null>(null);
   const [folderRetry, setFolderRetry] = useState(0);
+  const pageRef = useRef<HTMLDivElement>(null);
   const userId = user?.id;
+  const notifications = useNotifications(userId, currentPath);
 
   const navigate = useCallback((nextPath: string) => {
     window.history.pushState({}, "", nextPath);
     setCurrentPath(nextPath);
+    if (nextPath === "/login") setAuthMode("login");
     window.scrollTo({ top: 0, behavior: "instant" });
+    pageRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
   useEffect(() => {
@@ -131,28 +139,31 @@ export default function App() {
   const parsedUrl = new URL(currentPath, "http://localhost");
   const pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/";
 
-  if (pathname === "/privacy" || pathname === "/terms" || pathname === "/cookies") {
-    const document = pathname.slice(1) as "privacy" | "terms" | "cookies";
-    return <LegalPage document={document} />;
+  function withAssistant(page: ReactNode) {
+    return <AssistantFrame pageRef={pageRef} pathname={pathname} userId={userId} onNavigate={navigate}>{page}</AssistantFrame>;
   }
 
+  if (pathname === "/privacy" || pathname === "/terms" || pathname === "/cookies") {
+    const document = pathname.slice(1) as "privacy" | "terms" | "cookies";
+    return withAssistant(<LegalPage document={document} />);
+  }
 
   if (!isKnownPath(pathname)) {
-    return <NotFoundPage onHome={() => navigate("/")} />;
+    return withAssistant(<NotFoundPage onHome={() => navigate("/")} />);
   }
 
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0B0E17]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#5B6CFA]"/>
+        <Loader2 className="h-8 w-8 animate-spin text-[#5B6CFA]" />
       </div>
     );
   }
 
-  if (!user && pathname === "/") return <LandingPage theme={theme} onToggleTheme={toggleTheme} />;
+  if (!user && pathname === "/") return withAssistant(<LandingPage theme={theme} onToggleTheme={toggleTheme} />);
 
   if (!user) {
-    return (
+    return withAssistant(
       <AuthScreen
         mode={authMode}
         theme={theme}
@@ -177,13 +188,32 @@ export default function App() {
   const currentFolders = folderList?.userId === user.id ? folderList : null;
 
   function renderMainRoute() {
-    if (pathname === "/library") {
-      const initialTab =
-        typeParam === "sets" ? "sets" : typeParam === "guides" ? "guides" : "all";
+    if (pathname === "/help") return <HelpView />;
+
+    if (pathname === "/study-groups") {
+      return <StudyGroupsView onOpenGroup={(id) => navigate(`/study-groups/${encodeURIComponent(id)}`)} />;
+    }
+
+    const groupMatch = pathname.match(/^\/study-groups\/([^/]+)$/);
+    if (groupMatch) {
+      return <StudyGroupView key={groupMatch[1]} groupId={groupMatch[1]} onBack={() => navigate("/study-groups")} />;
+    }
+
+    if (pathname === "/notifications") {
+      return <NotificationsView inbox={notifications.inbox} error={notifications.error} saving={notifications.saving}
+        onRefresh={() => void notifications.update()}
+        onMarkRead={(ids) => void notifications.update(ids)}
+        onOpenSet={(setId) => navigate(`/sets/${encodeURIComponent(setId)}`)}
+        onOpenGenerate={() => setGenerateOpen(true)} />;
+    }
+
+    if (pathname === "/library" || pathname === "/practice-test") {
+      const activeTab = pathname === "/practice-test" ? "practice"
+        : typeParam === "sets" || typeParam === "guides" || typeParam === "activities" ? typeParam : "all";
       return (
         <LibraryView
           initialQuery={searchQuery}
-          initialTab={initialTab}
+          activeTab={activeTab}
           onNavigate={navigate}
           onOpenGenerate={() => setGenerateOpen(true)}
         />
@@ -192,10 +222,6 @@ export default function App() {
 
     if (pathname === "/sets/new") {
       return <SetFormView mode="create" onNavigate={navigate} />;
-    }
-
-    if (pathname === "/practice-test") {
-      return <PracticeTestView onNavigate={navigate} />;
     }
 
     const folderMatch = pathname.match(/^\/folders\/([^/]+)$/);
@@ -289,7 +315,7 @@ export default function App() {
     return <NotFoundPage onHome={() => navigate("/")} />;
   }
 
-  return (
+  return withAssistant(
     <>
       <AppShell
         user={user}
@@ -302,6 +328,8 @@ export default function App() {
         onNavigate={navigate}
         onOpenGenerate={() => setGenerateOpen(true)}
         onLogout={handleLogout}
+        unreadNotifications={notifications.inbox?.unreadCount ?? 0}
+        onRefreshNotifications={() => void notifications.update()}
       >
         {renderMainRoute()}
       </AppShell>

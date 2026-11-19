@@ -52,11 +52,38 @@ export interface FolderSummary {
   name: string;
 }
 
+export interface StudyGroupSummary {
+  id: string;
+  name: string;
+  isOwner: boolean;
+  memberCount: number;
+}
+
+export interface StudyGroupDetail extends StudyGroupSummary {
+  inviteCode?: string;
+  members: { id: string; name: string; isOwner: boolean }[];
+}
+
 export interface QuizAttemptSummary {
   id: string;
   score: number;
   total: number;
   createdAt: string;
+}
+
+export interface StudyNotification {
+  id: string;
+  kind: "quiz" | "generation-saved" | "generation-failed";
+  title: string;
+  description: string;
+  createdAt: string;
+  read: boolean;
+  setId?: string;
+}
+
+export interface NotificationInbox {
+  notifications: StudyNotification[];
+  unreadCount: number;
 }
 
 export interface StudySetDetail {

@@ -29,11 +29,11 @@ export function PracticeTestView({ onNavigate }: { onNavigate: (path: string) =>
   }
 
   return (
-    <section className="mx-auto max-w-xl space-y-5">
-      <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight">
-        <ClipboardCheck aria-hidden="true" className="size-6 text-[#5B6CFA]" />
-        Practice test
-      </h1>
+    <section className="max-w-xl space-y-3">
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <ClipboardCheck aria-hidden="true" className="size-5 text-[#5B6CFA]" />
+        Practice Test
+      </h2>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-[#141926]">
         {error ? (
           <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>

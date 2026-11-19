@@ -32,6 +32,8 @@ const documents: Record<LegalDocument, { title: string; sections: { heading: str
         paragraphs: [
           "Account details are used to authenticate you and control access to your materials. Your materials are used to display, edit, and organize your study work. If you choose AI generation, the notes or uploaded file content you submit is sent to Google Gemini to generate study materials. Google also handles sign-in when you choose Google sign-in. The app does not currently include advertising or analytics services.",
           "When you ask a question in Ask AI, NoteDeck sends it to Gemini along with relevant source text or flashcards and a limited number of recent chat turns.",
+          "Study group members can see the group name and each other’s display names. Joining a group does not share your email address, personal study library, or quiz results with the group.",
+          "When you use the floating NoteDeck Assistant while signed in, NoteDeck sends your message, up to four recent turns, and selected excerpts from the saved set or guide you have open to Gemini. The conversation stays in the current page session and is not saved to your NoteDeck account. Guest FAQ answers are handled in your browser.",
           "Do not submit sensitive personal information or another person’s private information in notes or files. Review Google’s own terms and privacy information for its processing of data sent to its services.",
         ],
       },

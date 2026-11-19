@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
-import { FileText, Folder, Home, Layers, Library, X } from "lucide-react";
+import { Activity, ClipboardCheck, FileText, Folder, Gamepad2, Home, Layers, UsersRound, X } from "lucide-react";
 import type { FolderSummary } from "@/src/types/api";
 
 interface AppSidebarProps {
@@ -15,14 +15,17 @@ const sidebarSurface = "border-slate-200 bg-white dark:border-slate-800 dark:bg-
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500";
 const navItem = "relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium";
 const sectionLabel = "mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400";
+const soonBadge = "ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-[#1C2336] dark:text-slate-300";
 
 export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, onMobileClose, onNavigate }: AppSidebarProps) {
   const drawer = useRef<HTMLDialogElement>(null);
-  const { pathname, searchParams } = new URL(currentPath, window.location.origin);
+  const url = new URL(currentPath, window.location.origin);
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
+  const { searchParams } = url;
   const libraryType = searchParams.get("type");
-  const activePath = pathname === "/library" && (libraryType === "sets" || libraryType === "guides")
+  const activePath = pathname === "/library" && (libraryType === "sets" || libraryType === "guides" || libraryType === "activities")
     ? `/library?type=${libraryType}`
-    : pathname;
+    : pathname.startsWith("/study-groups/") ? "/study-groups" : pathname;
 
   useEffect(() => {
     drawer.current?.close();
@@ -51,7 +54,17 @@ export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, on
     onNavigate(path);
   }
 
-  function navLink(path: string, label: string, icon: ReactNode) {
+  function comingSoon(label: string, icon: ReactNode) {
+    return (
+      <span className={`${navItem} text-slate-500 dark:text-slate-400`}>
+        {icon}
+        <span>{label}</span>
+        <span className={soonBadge}>Soon</span>
+      </span>
+    );
+  }
+
+  function navLink(path: string, label: string, icon: ReactNode, badge?: string) {
     const active = activePath === path;
     return (
       <a href={path} onClick={(event) => navigate(event, path)} aria-current={active ? "page" : undefined}
@@ -63,6 +76,7 @@ export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, on
         }`}>
         {icon}
         <span className="min-w-0 truncate">{label}</span>
+        {badge && <span className={soonBadge}>{badge}</span>}
       </a>
     );
   }
@@ -73,14 +87,22 @@ export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, on
       <div>
         <ul className="space-y-0.5">
           <li>{navLink("/", "Home", <Home aria-hidden="true" className={iconClass} />)}</li>
-          <li>{navLink("/library", "Your library", <Library aria-hidden="true" className={iconClass} />)}</li>
+          <li>{comingSoon("Games", <Gamepad2 aria-hidden="true" className={iconClass} />)}</li>
+          <li>{navLink("/study-groups", "Study groups", <UsersRound aria-hidden="true" className={iconClass} />)}</li>
         </ul>
       </div>
       <div>
-        <h2 className={sectionLabel}>Study</h2>
+        <h2 className="mb-1.5 px-3 text-xs font-semibold text-slate-600 dark:text-slate-400">
+          <a href="/library" onClick={(event) => navigate(event, "/library")}
+            aria-current={activePath === "/library" ? "page" : undefined} className="rounded-sm hover:underline">
+            Your Library
+          </a>
+        </h2>
         <ul className="space-y-0.5">
           <li>{navLink("/library?type=sets", "Flashcards", <Layers aria-hidden="true" className={iconClass} />)}</li>
-          <li>{navLink("/library?type=guides", "Study Guides", <FileText aria-hidden="true" className={iconClass} />)}</li>
+          <li>{navLink("/library?type=guides", "Study guides", <FileText aria-hidden="true" className={iconClass} />)}</li>
+          <li>{navLink("/practice-test", "Practice Test", <ClipboardCheck aria-hidden="true" className={iconClass} />)}</li>
+          <li>{navLink("/library?type=activities", "Activities", <Activity aria-hidden="true" className={iconClass} />, "Soon")}</li>
         </ul>
       </div>
       <div>

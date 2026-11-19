@@ -78,3 +78,67 @@
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
+/* Jakob: place chat in the expected corner. Fitts: 56px target, 16px edge gap.
+   The reserved rail/dock keeps page actions clear. App overlays use z-50 or the top layer. */
+.assistant-frame {
+  --assistant-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  --assistant-right: calc(1rem + env(safe-area-inset-right, 0px));
+  --assistant-lift: 0px;
+  --assistant-dock: calc(4rem + var(--assistant-bottom) + var(--assistant-lift));
+  min-height: 100dvh;
+}
+
+html:has(.assistant-frame) {
+  scrollbar-gutter: auto;
+}
+
+.assistant-page {
+  height: calc(100dvh - var(--assistant-dock));
+  overflow: auto;
+  scroll-padding-top: 5rem;
+  border-bottom: 1px solid var(--color-slate-200);
+}
+
+.dark .assistant-page { border-color: var(--color-slate-800); }
+
+.assistant-page > :where(.min-h-screen, .min-h-dvh) { min-height: 100%; }
+
+.assistant-launcher {
+  position: fixed;
+  z-index: 40;
+  right: var(--assistant-right);
+  bottom: calc(var(--assistant-bottom) + var(--assistant-lift));
+}
+
+.assistant-dialog {
+  position: fixed;
+  inset: auto 0 var(--assistant-keyboard, 0px);
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  height: min(35rem, calc(var(--assistant-visible-height, 100dvh) - env(safe-area-inset-top, 0px) - 0.75rem));
+  max-height: none;
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding: 0;
+}
+
+.assistant-compose { padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px)); }
+
+@media (min-width: 640px) {
+  .assistant-page {
+    height: auto;
+    overflow: visible;
+    padding-inline-end: calc(4rem + var(--assistant-right));
+    border-bottom: 0;
+  }
+
+  .assistant-page > :where(.min-h-screen, .min-h-dvh) { min-height: 100dvh; }
+
+  .assistant-dialog {
+    inset: auto var(--assistant-right) calc(var(--assistant-bottom) + var(--assistant-lift)) auto;
+    width: 23.75rem;
+    height: min(35rem, calc(100dvh - var(--assistant-bottom) - var(--assistant-lift) - 1rem));
+    border-radius: 1rem;
+  }
+}

@@ -66,6 +66,14 @@ Signup, password login, and Google OAuth requests are limited per client IP. Upl
 
 The server scopes decks, cards, guides, folders, attempts, chat, and generation jobs to the signed-in account. Browser writes require the NoteDeck origin. Session cookies expire after seven days, and deactivation invalidates existing sessions. Account deletion requires the current password or a fresh confirmation with the account’s linked Google identity.
 
+## Chatbot
+
+Open **NoteDeck Assistant** from the bottom right. Guests can browse the public FAQ. Signed-in users can ask about NoteDeck or get help with the saved set, practice test, or guide they have open. When no material is open, choose an item from Library. To update product facts and FAQ answers, edit `src/chatbot/knowledge.ts`. The assistant uses the existing server-side `GEMINI_API_KEY` from `.env` and needs no additional environment variables.
+
+The server checks ownership before sending up to 12,000 characters of context, the latest four turns, and the current question to Gemini. Questions are capped at 1,000 characters. Each account can send eight requests per minute and have one in progress at a time. The conversation lives in page memory and resets when the material or account changes. The current tab remembers only whether the panel is open. This chat is separate from the saved **Ask AI** conversation in a set.
+
+The bottom-right placement follows Jakob’s Law. The 56 px target, safe-area offsets, and right-thumb placement support Fitts’s Law and mobile reach. A reserved rail on desktop and a dock on mobile keep the launcher clear of page actions. Mark future fixed bottom bars or toasts with `data-assistant-bottom-obstruction` to move it above them. Four suggestions support recognition and keep the initial choices manageable. The dialog traps and restores focus, and the launcher and typing indicator respect reduced motion.
+
 ### Administrator access
 
 Administrators can open **Manage users** from the profile menu to change roles and suspend or restore accounts. Suspending an account invalidates its existing sessions. Role and access changes are recorded in the local database. Administrators cannot change their own role or suspend their own account.

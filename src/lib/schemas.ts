@@ -36,6 +36,15 @@ export const studySetInputSchema = z.object({
 
 export const folderNameSchema = z.string().trim().min(1, "Enter a folder name.").max(80, "Use 80 characters or fewer.");
 
+export const studyGroupNameSchema = z.object({
+  name: z.string().trim().min(2, "Enter a group name with at least 2 characters.").max(60, "Use 60 characters or fewer."),
+});
+
+export const studyGroupInviteSchema = z.object({
+  code: z.string().trim().max(40).transform((code) => code.replace(/[\s-]/g, "").toUpperCase())
+    .refine((code) => /^[0-9A-F]{16}$/.test(code), "Enter the 16-character invite code."),
+});
+
 export const folderItemInputSchema = z.object({
   kind: z.enum(["set", "guide"]),
   id: z.string().min(1),
@@ -68,6 +77,12 @@ export const quizAttemptInputSchema = z.object({
   setId: z.string().min(1),
   score: z.number().int().min(0),
   total: z.number().int().min(1),
+});
+
+export const NOTIFICATION_INBOX_LIMIT = 30;
+
+export const markNotificationsReadSchema = z.object({
+  ids: z.array(z.string().min(1).max(256)).min(1).max(NOTIFICATION_INBOX_LIMIT),
 });
 
 export const MAX_CHAT_QUESTION_CHARS = 1000;

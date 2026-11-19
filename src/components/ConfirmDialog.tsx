@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel: string;
   loading?: boolean;
+  loadingLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -17,6 +18,7 @@ export function ConfirmDialog({
   message,
   confirmLabel,
   loading = false,
+  loadingLabel = "Deleting...",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -83,7 +85,7 @@ export function ConfirmDialog({
             disabled={loading}
             className="whitespace-nowrap rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
-            {loading ? "Deleting..." : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
     </dialog>
