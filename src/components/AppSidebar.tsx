@@ -1,14 +1,13 @@
-import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
-import { Activity, ClipboardCheck, FileText, Folder, Gamepad2, Home, Layers, UsersRound, X } from "lucide-react";
+import { type MouseEvent, type ReactNode } from "react";
+import { Activity, ClipboardCheck, FileText, Folder, Gamepad2, Home, Layers, UsersRound } from "lucide-react";
 import type { FolderSummary } from "@/src/types/api";
 
-interface AppSidebarProps {
+export interface AppNavigationProps {
   folders?: FolderSummary[];
   foldersFailed?: boolean;
   currentPath: string;
-  mobileOpen: boolean;
-  onMobileClose: () => void;
   onNavigate: (path: string) => void;
+  hideHome?: boolean;
 }
 
 const sidebarSurface = "border-slate-200 bg-white dark:border-slate-800 dark:bg-[#131826]";
@@ -17,8 +16,7 @@ const navItem = "relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-
 const sectionLabel = "mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400";
 const soonBadge = "ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-[#1C2336] dark:text-slate-300";
 
-export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, onMobileClose, onNavigate }: AppSidebarProps) {
-  const drawer = useRef<HTMLDialogElement>(null);
+export function AppNavigation({ folders, foldersFailed, currentPath, onNavigate, hideHome }: AppNavigationProps) {
   const url = new URL(currentPath, window.location.origin);
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   const { searchParams } = url;
@@ -27,30 +25,10 @@ export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, on
     ? `/library?type=${libraryType}`
     : pathname.startsWith("/study-groups/") ? "/study-groups" : pathname;
 
-  useEffect(() => {
-    drawer.current?.close();
-  }, [currentPath]);
-
-  useEffect(() => {
-    const dialog = drawer.current;
-    if (mobileOpen && !dialog?.open) dialog?.showModal();
-    if (!mobileOpen && dialog?.open) dialog.close();
-  }, [mobileOpen]);
-
-  useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 768px)");
-    function handleResize() {
-      if (desktop.matches) drawer.current?.close();
-    }
-    desktop.addEventListener("change", handleResize);
-    return () => desktop.removeEventListener("change", handleResize);
-  }, []);
-
   function navigate(event: MouseEvent<HTMLAnchorElement>, path: string) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey ||
         event.shiftKey || event.altKey) return;
     event.preventDefault();
-    drawer.current?.close();
     onNavigate(path);
   }
 
@@ -82,11 +60,11 @@ export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, on
   }
 
   const iconClass = "size-4 shrink-0";
-  const navigation = (
+  return (
     <nav aria-label="Primary navigation" className="flex min-h-0 flex-1 flex-col gap-6">
       <div>
         <ul className="space-y-0.5">
-          <li>{navLink("/", "Home", <Home aria-hidden="true" className={iconClass} />)}</li>
+          {!hideHome && <li>{navLink("/", "Home", <Home aria-hidden="true" className={iconClass} />)}</li>}
           <li>{comingSoon("Games", <Gamepad2 aria-hidden="true" className={iconClass} />)}</li>
           <li>{navLink("/study-groups", "Study groups", <UsersRound aria-hidden="true" className={iconClass} />)}</li>
         </ul>
@@ -121,28 +99,12 @@ export function AppSidebar({ folders, foldersFailed, currentPath, mobileOpen, on
       </div>
     </nav>
   );
+}
 
+export function AppSidebar(props: AppNavigationProps) {
   return (
-    <>
-      <aside className={`sticky top-16 hidden max-h-[calc(100dvh-4rem)] w-60 shrink-0 overflow-y-auto border-r p-3 md:flex md:flex-col ${sidebarSurface}`}>
-        {navigation}
-      </aside>
-      <dialog id="mobile-sidebar" ref={drawer} aria-labelledby="mobile-sidebar-title"
-        onClose={onMobileClose}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) drawer.current?.close();
-        }}
-        className={`fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-64 max-w-[90vw] -translate-x-full overflow-y-auto border-r text-inherit transition-[translate,display,overlay] duration-200 [transition-behavior:allow-discrete] open:translate-x-0 starting:open:-translate-x-full backdrop:bg-black/50 motion-reduce:transition-none md:hidden ${sidebarSurface}`}>
-        <div className="flex min-h-full flex-col px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="mb-3 flex items-center justify-between pl-3">
-            <h2 id="mobile-sidebar-title" className="text-sm font-semibold">Navigation</h2>
-            <button type="button" autoFocus aria-label="Close navigation"
-              className={`grid size-10 place-items-center rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 ${focusRing}`}
-              onClick={() => drawer.current?.close()}><X aria-hidden="true" className="size-4" /></button>
-          </div>
-          {navigation}
-        </div>
-      </dialog>
-    </>
+    <aside className={`sticky top-16 hidden max-h-[calc(100dvh-4rem)] w-60 shrink-0 overflow-y-auto border-r p-3 md:flex md:flex-col ${sidebarSurface}`}>
+      <AppNavigation {...props} />
+    </aside>
   );
 }

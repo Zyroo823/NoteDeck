@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   Bell,
-  BookOpen,
   ClipboardCheck,
   FileLock2,
   Folder,
@@ -9,7 +8,6 @@ import {
   LifeBuoy,
   LogOut,
   Moon,
-  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -19,6 +17,7 @@ import {
 } from "lucide-react";
 import type { AuthUser, FolderSummary } from "@/src/types/api";
 import { AppSidebar } from "@/src/components/AppSidebar";
+import { MobileNavigation } from "@/src/components/MobileNavigation";
 
 interface AppShellProps {
   user: AuthUser;
@@ -54,7 +53,6 @@ export function AppShell({
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [createOpen, setCreateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [navigationOpen, setNavigationOpen] = useState(false);
 
   const createRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLDivElement | null>(null);
@@ -92,10 +90,32 @@ export function AppShell({
     };
   }, []);
 
+  function searchLibrary(query: string) {
+    const trimmed = query.trim();
+    onNavigate(trimmed ? `/library?q=${encodeURIComponent(trimmed)}` : "/library");
+  }
+
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmed = searchInput.trim();
-    onNavigate(trimmed ? `/library?q=${encodeURIComponent(trimmed)}` : "/library");
+    searchLibrary(searchInput);
+  }
+
+  function createActions(close: () => void, desktop = false) {
+    const actions = [
+      { label: "Flashcard set", icon: Layers, run: () => onNavigate("/sets/new") },
+      { label: "Generate with AI", icon: Sparkles, run: onOpenGenerate },
+      { label: "Practice test", icon: ClipboardCheck, run: () => onNavigate("/practice-test") },
+      { label: "Folder", icon: Folder, run: () => onNavigate("/folders/new") },
+    ];
+
+    return actions.map(({ label, icon: Icon, run }) => (
+      <button key={label} type="button" role={desktop ? "menuitem" : undefined}
+        onClick={() => { close(); run(); }}
+        className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]">
+        <Icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${Icon === Sparkles ? "text-teal-600 dark:text-[#2DD4BF]" : "text-[#5B6CFA]"}`} />
+        {label}
+      </button>
+    ));
   }
 
   const initialLetter = user.name.trim().slice(0, 1).toUpperCase() || "S";
@@ -108,32 +128,15 @@ export function AppShell({
       <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:gap-4 sm:px-4 dark:border-slate-800 dark:bg-[#0B0E17]/95">
         <button
           type="button"
-          aria-label="Open navigation"
-          aria-controls="mobile-sidebar"
-          aria-expanded={navigationOpen}
-          aria-haspopup="dialog"
-          onClick={() => {
-            setNavigationOpen(true);
-            setCreateOpen(false);
-            setProfileOpen(false);
-          }}
-          className="grid size-11 shrink-0 place-items-center rounded-xl text-slate-700 hover:bg-slate-100 md:hidden dark:text-slate-200 dark:hover:bg-[#1C2336]"
-        >
-          <PanelLeftOpen aria-hidden="true" className="size-5" />
-        </button>
-        <button
-          type="button"
           onClick={() => onNavigate("/")}
           aria-label="Go to NoteDeck Home"
-          className="hidden items-center gap-2.5 rounded-xl py-1.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA] sm:flex"
+          className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-xl py-1.5 text-left whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFA]"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#494bd2] text-white">
-            <BookOpen className="h-4 w-4" />
-          </span>
-          <span className="hidden text-base font-bold tracking-tight sm:inline">NoteDeck</span>
+          <img src="/favicon.svg" alt="" width={32} height={32} className="size-8" />
+          <span className="text-base font-bold tracking-tight">NoteDeck</span>
         </button>
 
-        <form onSubmit={handleSearchSubmit} className="min-w-0 max-w-xl flex-1">
+        <form onSubmit={handleSearchSubmit} className="hidden min-w-0 max-w-xl flex-1 md:block">
           <label htmlFor="top-search-library" className="sr-only">
             Search your library
           </label>
@@ -151,7 +154,7 @@ export function AppShell({
         </form>
 
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative" ref={createRef}>
+          <div className="relative hidden md:block" ref={createRef}>
             <button
               type="button"
               onClick={() => {
@@ -171,49 +174,7 @@ export function AppShell({
                 aria-label="Create menu"
                 className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-800 dark:bg-[#141926]"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    onNavigate("/sets/new");
-                  }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]"
-                >
-                  <Layers className="h-4 w-4 text-[#5B6CFA]" />
-                  Flashcard set
-                </button>
-
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    onOpenGenerate();
-                  }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]"
-                >
-                  <Sparkles className="h-4 w-4 text-[#2DD4BF]" />
-                  Generate with AI
-                </button>
-
-                <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
-
-                <button type="button" role="menuitem" onClick={() => {
-                  setCreateOpen(false);
-                  onNavigate("/practice-test");
-                }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]">
-                  <ClipboardCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-[#5B6CFA]" />
-                  Practice test
-                </button>
-
-                <button type="button" role="menuitem" onClick={() => {
-                  setCreateOpen(false);
-                  onNavigate("/folders/new");
-                }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition hover:bg-slate-100 dark:hover:bg-[#1C2336]">
-                  <Folder aria-hidden="true" className="h-4 w-4 shrink-0 text-[#5B6CFA]" />
-                  Folder
-                </button>
+                {createActions(() => setCreateOpen(false), true)}
               </div>
             ) : null}
           </div>
@@ -325,8 +286,7 @@ export function AppShell({
       </header>
 
       <div className="flex flex-1">
-        <AppSidebar key={user.id} folders={folders} foldersFailed={foldersFailed} currentPath={currentPath}
-          mobileOpen={navigationOpen} onMobileClose={() => setNavigationOpen(false)} onNavigate={onNavigate} />
+        <AppSidebar key={user.id} folders={folders} foldersFailed={foldersFailed} currentPath={currentPath} onNavigate={onNavigate} />
 
         <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 focus-visible:outline-none sm:px-6 lg:px-10">
           <div className="mx-auto w-full max-w-5xl">{children}</div>
@@ -337,6 +297,9 @@ export function AppShell({
         <a href="/terms" className="hover:underline focus-visible:underline">Terms of Service</a>
         <a href="/cookies" className="hover:underline focus-visible:underline">Cookie Policy</a>
       </footer>
+      <MobileNavigation folders={folders} foldersFailed={foldersFailed} currentPath={currentPath} onNavigate={onNavigate}
+        searchQuery={searchQuery} createActions={createActions}
+        onOpenPanel={() => { setCreateOpen(false); setProfileOpen(false); }} />
     </div>
   );
 }

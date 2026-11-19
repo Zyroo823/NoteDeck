@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type 
 import { ArrowUp, BookOpen, MessageCircle, Minus, Sparkles, Trash2, X } from "lucide-react";
 import { ASSISTANT_HISTORY_TURNS, MAX_ASSISTANT_QUESTION, materialFromPath, type AssistantMaterial, type AssistantTurn } from "@/src/chatbot/assistant";
 import { answerGuestFaq, assistantFaq } from "@/src/chatbot/knowledge";
+import { AssistantLauncherContext } from "@/src/chatbot/launcher";
 import { StudyChatMarkdown } from "@/src/components/StudyChatMarkdown";
 
 const SESSION_KEY = "notedeck-assistant-open";
@@ -28,6 +29,7 @@ export function AssistantFrame({ children, pageRef, pathname, userId, onNavigate
   const [seen, setSeen] = useState(open);
   const frame = useRef<HTMLDivElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
+  const opener = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const material = userId ? materialFromPath(pathname) : undefined;
@@ -40,7 +42,8 @@ export function AssistantFrame({ children, pageRef, pathname, userId, onNavigate
       title.current?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
-      launcher.current?.focus();
+      const button = opener.current?.getClientRects().length ? opener.current : launcher.current;
+      button?.focus({ preventScroll: true });
     }
   }, [open]);
 
@@ -111,6 +114,11 @@ export function AssistantFrame({ children, pageRef, pathname, userId, onNavigate
     try { window.sessionStorage.setItem(SESSION_KEY, String(next)); } catch { /* Storage may be blocked. */ }
   }
 
+  function openFrom(button: HTMLButtonElement) {
+    opener.current = button;
+    setPanelOpen(true);
+  }
+
   function handleDialogKeys(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key !== "Tab") return;
     const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
@@ -135,10 +143,12 @@ export function AssistantFrame({ children, pageRef, pathname, userId, onNavigate
 
   return (
     <div ref={frame} className="assistant-frame bg-slate-50 text-slate-900 dark:bg-[#0B0E17] dark:text-slate-100">
-      <div ref={pageRef} className="assistant-page">{children}</div>
+      <AssistantLauncherContext.Provider value={{ isOpen: open, showHint: !seen, openFrom }}>
+        <div ref={pageRef} className="assistant-page">{children}</div>
+      </AssistantLauncherContext.Provider>
       <div className="assistant-launcher group">
         <button ref={launcher} type="button" aria-label={LAUNCH_LABEL} aria-expanded={open} aria-controls="notedeck-assistant"
-          onClick={() => setPanelOpen(true)}
+          onClick={(event) => openFrom(event.currentTarget)}
           className={`${primaryButton} relative grid size-14 place-items-center rounded-full shadow-lg shadow-indigo-950/25 motion-safe:transition-colors`}>
           <MessageCircle className="size-6" aria-hidden="true" />
           {!seen && <span aria-hidden="true" className="absolute right-1 top-1 size-3 rounded-full border-2 border-[#494bd2] bg-amber-300" />}
